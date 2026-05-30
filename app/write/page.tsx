@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Camera, Sparkles, RefreshCw } from "lucide-react";
+import { Camera, Sparkles } from "lucide-react";
 import EntryEditor from "@/components/EntryEditor";
 import { saveEntry, getEntries, getUserName, setUserName } from "@/lib/storage";
 import { getRandomQuestion } from "@/lib/questions";
@@ -231,10 +231,7 @@ function WriteContent() {
             }}
           >
             <span>{question}</span>
-            <span className="shrink-0 flex items-center gap-1" style={{ color: "rgba(160,125,224,0.7)" }}>
-              <RefreshCw size={13} />
-              <span className="text-[11px] font-medium">inne</span>
-            </span>
+            <span className="shrink-0 text-[18px] leading-none" style={{ color: "rgba(160,125,224,0.6)" }}>›</span>
           </button>
         ) : (
           <button
@@ -317,25 +314,21 @@ function WriteContent() {
           return (
             <button
               onClick={handleSave}
-              disabled={saving || !hasContent}
-              className="block mx-auto py-3.5 font-semibold text-sm disabled:cursor-default active:scale-[0.98]"
+              disabled={saving}
+              className="block mx-auto py-3.5 font-semibold text-sm disabled:opacity-50 active:scale-[0.98] transition-all"
               style={{
                 background: hasContent
                   ? "linear-gradient(135deg, #7C5CBF 0%, #A07DE0 100%)"
-                  : "rgba(124,92,191,0.10)",
+                  : "rgba(124,92,191,0.12)",
                 border: hasContent
                   ? "none"
-                  : "1px solid rgba(160,125,224,0.25)",
+                  : "1px solid rgba(160,125,224,0.35)",
                 borderRadius: "14px",
-                color: hasContent ? "#fff" : "rgba(160,125,224,0.4)",
+                color: hasContent ? "#fff" : "#A07DE0",
                 paddingLeft: "24px",
                 paddingRight: "24px",
                 width: "40%",
                 boxShadow: "none",
-                opacity: hasContent ? 1 : 0,
-                transform: hasContent ? "translateY(0)" : "translateY(6px)",
-                transition: "opacity 0.25s ease, transform 0.25s ease, background 0.2s ease",
-                pointerEvents: hasContent ? "auto" : "none",
               }}
             >
               Zapisz wpis
