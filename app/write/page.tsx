@@ -20,7 +20,7 @@ function NameSetupModal({ onDone }: { onDone: (name: string) => void }) {
   const [name, setName] = useState("");
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center px-4 pb-10"
+      className="fixed inset-0 z-[200] flex items-end justify-center px-4 pb-10"
       style={{ background: "rgba(7,5,26,0.75)", backdropFilter: "blur(10px)" }}
     >
       <div
@@ -60,9 +60,7 @@ function NameSetupModal({ onDone }: { onDone: (name: string) => void }) {
                 border: hasName ? "none" : "1px solid rgba(160,125,224,0.35)",
                 borderRadius: "14px",
                 color: hasName ? "#fff" : "#A07DE0",
-                paddingLeft: "24px",
-                paddingRight: "24px",
-                width: "40%",
+                width: "100%",
                 boxShadow: "none",
                 transition: "background 0.2s ease, color 0.2s ease, border 0.2s ease",
               }}
