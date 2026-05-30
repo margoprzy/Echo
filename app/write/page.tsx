@@ -46,20 +46,31 @@ function NameSetupModal({ onDone }: { onDone: (name: string) => void }) {
             border: "1px solid rgba(124,92,191,0.35)",
           }}
         />
-        <button
-          onClick={() => name.trim() && onDone(name.trim())}
-          className="block mx-auto py-3.5 font-semibold text-white text-sm active:scale-[0.98] transition-all"
-          style={{
-            background: "linear-gradient(135deg, #7C5CBF 0%, #A07DE0 100%)",
-            borderRadius: "14px",
-            paddingLeft: "24px",
-            paddingRight: "24px",
-            width: "40%",
-            boxShadow: "none",
-          }}
-        >
-          Zaczynamy
-        </button>
+        {(() => {
+          const hasName = !!name.trim();
+          return (
+            <button
+              onClick={() => hasName && onDone(name.trim())}
+              disabled={!hasName}
+              className="block mx-auto py-3.5 font-semibold text-sm disabled:cursor-default active:scale-[0.98] transition-all"
+              style={{
+                background: hasName
+                  ? "linear-gradient(135deg, #7C5CBF 0%, #A07DE0 100%)"
+                  : "rgba(124,92,191,0.12)",
+                border: hasName ? "none" : "1px solid rgba(160,125,224,0.35)",
+                borderRadius: "14px",
+                color: hasName ? "#fff" : "#A07DE0",
+                paddingLeft: "24px",
+                paddingRight: "24px",
+                width: "40%",
+                boxShadow: "none",
+                transition: "background 0.2s ease, color 0.2s ease, border 0.2s ease",
+              }}
+            >
+              Zaczynamy
+            </button>
+          );
+        })()}
         <div className="h-12" />
       </div>
     </div>
