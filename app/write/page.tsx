@@ -53,6 +53,7 @@ function NameSetupModal({ onDone }: { onDone: (name: string) => void }) {
         >
           Zaczynamy
         </button>
+        <div className="h-20" />
       </div>
     </div>
   );
