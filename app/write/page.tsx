@@ -48,12 +48,19 @@ function NameSetupModal({ onDone }: { onDone: (name: string) => void }) {
         />
         <button
           onClick={() => name.trim() && onDone(name.trim())}
-          className="w-full py-3.5 rounded-full font-semibold text-white text-sm"
-          style={{ background: "linear-gradient(135deg, #7C5CBF 0%, #A07DE0 100%)" }}
+          className="block mx-auto py-3.5 font-semibold text-white text-sm active:scale-[0.98] transition-all"
+          style={{
+            background: "linear-gradient(135deg, #7C5CBF 0%, #A07DE0 100%)",
+            borderRadius: "14px",
+            paddingLeft: "24px",
+            paddingRight: "24px",
+            width: "40%",
+            boxShadow: "none",
+          }}
         >
           Zaczynamy
         </button>
-        <div className="h-20" />
+        <div className="h-12" />
       </div>
     </div>
   );
