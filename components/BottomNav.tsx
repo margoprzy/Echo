@@ -25,15 +25,11 @@ export default function BottomNav() {
           >
             <Icon
               size={22}
-              className={
-                active
-                  ? "text-[#A07DE0] drop-shadow-[0_0_8px_rgba(160,125,224,0.7)]"
-                  : "text-[#A07DE0]"
-              }
+              className={active ? "text-[#A07DE0]" : "text-white"}
             />
             <span
               className={`text-[11px] font-medium ${
-                active ? "text-[#A07DE0]" : "text-white/30"
+                active ? "text-[#A07DE0]" : "text-white"
               }`}
             >
               {label}
