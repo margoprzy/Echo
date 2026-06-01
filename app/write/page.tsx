@@ -281,8 +281,8 @@ function WriteContent() {
           <div
             className="relative px-4 pt-5 pb-5 rounded-[20px] border mb-4 echo-enter"
             style={{
-              background: "rgba(124,92,191,0.08)",
-              borderColor: "rgba(160,125,224,0.2)",
+              background: "rgba(255,255,255,0.045)",
+              borderColor: "rgba(255,255,255,0.10)",
               ["--enter-delay" as string]: "150ms",
             }}
           >
