@@ -335,11 +335,11 @@ function WriteContent() {
                 className="block mx-auto py-3.5 font-semibold text-sm active:scale-[0.98] transition-all"
                 style={{
                   background: saved
-                    ? "rgba(52,211,153,0.15)"
+                    ? "rgba(160,125,224,0.18)"
                     : "linear-gradient(135deg, #7C5CBF 0%, #A07DE0 100%)",
-                  border: saved ? "1px solid rgba(52,211,153,0.35)" : "none",
+                  border: saved ? "1px solid rgba(160,125,224,0.45)" : "none",
                   borderRadius: "14px",
-                  color: saved ? "#34D399" : "#fff",
+                  color: saved ? "#C4A8FF" : "#fff",
                   paddingLeft: "24px",
                   paddingRight: "24px",
                   width: "40%",
