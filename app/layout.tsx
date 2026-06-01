@@ -30,7 +30,7 @@ export default function RootLayout({
               className="relative w-full mx-auto min-h-screen max-w-[430px] md:max-w-2xl"
               style={{
                 background:
-                  "radial-gradient(125% 55% at 50% -8%, rgba(124,92,191,0.45) 0%, rgba(124,92,191,0.12) 32%, rgba(15,12,33,0) 60%), linear-gradient(180deg, #18122E 0%, #0F0C21 40%)",
+                  "radial-gradient(140% 70% at 50% -10%, rgba(150,114,224,0.7) 0%, rgba(124,92,191,0.4) 28%, rgba(124,92,191,0.12) 48%, rgba(15,12,33,0) 68%), linear-gradient(180deg, #1E1640 0%, #14102C 38%, #0B0820 75%)",
               }}
             >
               <main className="pb-[72px] md:pb-10">{children}</main>
