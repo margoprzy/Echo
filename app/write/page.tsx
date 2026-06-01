@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Camera, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import EntryEditor from "@/components/EntryEditor";
 import { saveEntry, getEntries, getUserName, setUserName } from "@/lib/storage";
 import { getRandomQuestion } from "@/lib/questions";
@@ -277,13 +277,6 @@ function WriteContent() {
               background: "#0F0C21",
             }}
           >
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="absolute top-2 right-2 p-3 rounded-xl transition-colors hover:bg-white/[0.10]"
-              style={{ color: "rgba(255,255,255,0.55)" }}
-            >
-              <Camera size={22} />
-            </button>
             <EntryEditor
               placeholder="Zanotuj swój dzień..."
               onUpdate={setContent}
