@@ -27,7 +27,7 @@ export default function EntryEditor({
     editorProps: {
       attributes: {
         class:
-          "min-h-[220px] outline-none text-white/90 text-[14px] leading-relaxed prose prose-invert max-w-none",
+          "min-h-[220px] outline-none text-white/90 text-[16px] md:text-[14px] leading-relaxed prose prose-invert max-w-none",
       },
     },
     onUpdate: ({ editor }) => {
@@ -57,7 +57,7 @@ export default function EntryEditor({
   return (
     <div className="relative" onClick={() => editor?.commands.focus()}>
       {isEmpty && !isFocused && (
-        <p className="absolute top-0 left-0 text-white/50 text-[14px] leading-relaxed pointer-events-none select-none">
+        <p className="absolute top-0 left-0 text-white/50 text-[16px] md:text-[14px] leading-relaxed pointer-events-none select-none">
           {placeholder}
         </p>
       )}
