@@ -261,7 +261,7 @@ function WriteContent() {
               setQuestion(getRandomQuestion());
               setTimeout(() => (document.querySelector(".ProseMirror") as HTMLElement)?.focus(), 80);
             }}
-            className="mb-4 text-[14px] font-medium text-white/80 text-left leading-relaxed flex items-center gap-2 hover:bg-white/[0.06] active:scale-[0.98] transition-all"
+            className="mb-4 text-[14px] font-medium text-white text-left leading-relaxed flex items-center gap-2 hover:bg-white/[0.06] active:scale-[0.98] transition-all"
             style={{
               background: "rgba(124,92,191,0.10)",
               border: "1px solid rgba(124,92,191,0.30)",
