@@ -318,31 +318,29 @@ function WriteContent() {
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
 
         {/* Save */}
-        <div className="h-6" />
         {(() => {
           const hasContent = !!content.replace(/<[^>]*>/g, "").trim() || !!photoUrl;
+          if (!hasContent) return null;
           return (
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="block mx-auto py-3.5 font-semibold text-sm disabled:opacity-50 active:scale-[0.98] transition-all"
-              style={{
-                background: hasContent
-                  ? "linear-gradient(135deg, #7C5CBF 0%, #A07DE0 100%)"
-                  : "rgba(124,92,191,0.12)",
-                border: hasContent
-                  ? "none"
-                  : "1px solid rgba(160,125,224,0.35)",
-                borderRadius: "14px",
-                color: hasContent ? "#fff" : "#A07DE0",
-                paddingLeft: "24px",
-                paddingRight: "24px",
-                width: "40%",
-                boxShadow: "none",
-              }}
-            >
-              Zapisz wpis
-            </button>
+            <>
+              <div className="h-6" />
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="block mx-auto py-3.5 font-semibold text-sm disabled:opacity-50 active:scale-[0.98] transition-all"
+                style={{
+                  background: "linear-gradient(135deg, #7C5CBF 0%, #A07DE0 100%)",
+                  borderRadius: "14px",
+                  color: "#fff",
+                  paddingLeft: "24px",
+                  paddingRight: "24px",
+                  width: "40%",
+                  boxShadow: "none",
+                }}
+              >
+                Zapisz wpis
+              </button>
+            </>
           );
         })()}
       </div>
