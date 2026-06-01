@@ -27,7 +27,7 @@ export default function EntryEditor({
     editorProps: {
       attributes: {
         class:
-          "min-h-[220px] outline-none text-white/90 text-[16px] md:text-[14px] leading-relaxed prose prose-invert max-w-none",
+          "min-h-[220px] outline-none text-white/90 text-[18px] md:text-[16px] leading-relaxed prose prose-invert max-w-none",
       },
     },
     onUpdate: ({ editor }) => {
