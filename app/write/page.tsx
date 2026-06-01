@@ -335,11 +335,11 @@ function WriteContent() {
                 className="block mx-auto py-3.5 font-semibold text-sm active:scale-[0.98] transition-all"
                 style={{
                   background: saved
-                    ? "rgba(160,125,224,0.18)"
-                    : "linear-gradient(135deg, #7C5CBF 0%, #A07DE0 100%)",
-                  border: saved ? "1px solid rgba(160,125,224,0.45)" : "none",
+                    ? "linear-gradient(135deg, #7C5CBF 0%, #A07DE0 100%)"
+                    : "rgba(160,125,224,0.18)",
+                  border: saved ? "none" : "1px solid rgba(160,125,224,0.45)",
                   borderRadius: "14px",
-                  color: saved ? "#C4A8FF" : "#fff",
+                  color: saved ? "#fff" : "#C4A8FF",
                   paddingLeft: "24px",
                   paddingRight: "24px",
                   width: "40%",
@@ -347,7 +347,7 @@ function WriteContent() {
                   transition: "background 0.2s ease, color 0.2s ease, border 0.2s ease",
                 }}
               >
-                {saved ? "Zapisano ✓" : "Zapisz wpis"}
+                {saved ? "Zapisano" : "Zapisz wpis"}
               </button>
             </>
           );
