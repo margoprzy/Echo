@@ -279,10 +279,8 @@ function WriteContent() {
         {/* Editor — collapsed or open */}
         {isEditorOpen ? (
           <div
-            className="relative px-4 pt-5 pb-5 rounded-[20px] border mb-4 echo-enter"
+            className="relative px-4 pt-5 pb-5 rounded-[20px] border border-white/10 bg-white/[0.055] mb-4 echo-enter"
             style={{
-              background: "rgba(255,255,255,0.045)",
-              borderColor: "rgba(255,255,255,0.10)",
               ["--enter-delay" as string]: "150ms",
             }}
           >
