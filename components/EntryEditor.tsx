@@ -57,7 +57,7 @@ export default function EntryEditor({
   return (
     <div className="relative" onClick={() => editor?.commands.focus()}>
       {isEmpty && !isFocused && (
-        <p className="absolute top-0 left-0 text-white/50 text-[14px] md:text-[13px] leading-relaxed pointer-events-none select-none">
+        <p className="absolute top-0 left-0 text-white/50 text-xs leading-relaxed pointer-events-none select-none">
           {placeholder}
         </p>
       )}
