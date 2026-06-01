@@ -35,8 +35,9 @@ export default function BottomNav() {
               }`}
             >
               <Icon
+                key={active ? pathname : undefined}
                 size={22}
-                className={active ? "text-[#A07DE0]" : "text-white"}
+                className={`${active ? "text-[#A07DE0] echo-nav-bounce" : "text-white"}`}
               />
               <span
                 className={`text-[11px] font-medium ${
