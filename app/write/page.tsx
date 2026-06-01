@@ -243,7 +243,7 @@ function WriteContent() {
               background: "rgba(124,92,191,0.09)",
               border: "1px solid rgba(124,92,191,0.2)",
               borderRadius: "16px",
-              color: "rgba(255,255,255,0.68)",
+              color: "#ffffff",
               padding: "14px 12px 14px 12px",
             }}
           >
