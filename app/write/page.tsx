@@ -248,7 +248,7 @@ function WriteContent() {
             }}
           >
             <span>{question}</span>
-            <span className="shrink-0 text-[18px] leading-none" style={{ color: "rgba(160,125,224,0.6)" }}>›</span>
+            <span className="shrink-0 text-[18px] leading-none" style={{ color: "#ffffff" }}>›</span>
           </button>
         ) : (
           <button
