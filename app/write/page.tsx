@@ -86,6 +86,7 @@ function WriteContent() {
   const [photoUrl, setPhotoUrl] = useState<string | undefined>();
   const [resetKey, setResetKey] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(true);
   const [userName, setUserNameState] = useState<string | null>(null);
   const [showNameSetup, setShowNameSetup] = useState(false);
@@ -131,17 +132,21 @@ function WriteContent() {
       ? { ...existingEntry, content, photoUrl }
       : { id: crypto.randomUUID(), date: new Date().toISOString(), content, photoUrl };
     saveEntry(entry);
-    setContent("");
-    setPhotoUrl(undefined);
-    setResetKey((k) => k + 1);
-    setIsEditorOpen(false);
-    setQuestion(null);
-    setSaving(false);
-    if (existingEntry) {
-      router.push(`/entries/${existingEntry.id}`);
-    } else {
-      router.push("/entries");
-    }
+    setSaved(true);
+    setTimeout(() => {
+      setContent("");
+      setPhotoUrl(undefined);
+      setResetKey((k) => k + 1);
+      setIsEditorOpen(false);
+      setQuestion(null);
+      setSaving(false);
+      setSaved(false);
+      if (existingEntry) {
+        router.push(`/entries/${existingEntry.id}`);
+      } else {
+        router.push("/entries");
+      }
+    }, 900);
   }
 
   const isEditing = !!existingEntry;
@@ -326,19 +331,23 @@ function WriteContent() {
               <div className="h-6" />
               <button
                 onClick={handleSave}
-                disabled={saving}
-                className="block mx-auto py-3.5 font-semibold text-sm disabled:opacity-50 active:scale-[0.98] transition-all"
+                disabled={saving || saved}
+                className="block mx-auto py-3.5 font-semibold text-sm active:scale-[0.98] transition-all"
                 style={{
-                  background: "linear-gradient(135deg, #7C5CBF 0%, #A07DE0 100%)",
+                  background: saved
+                    ? "rgba(52,211,153,0.15)"
+                    : "linear-gradient(135deg, #7C5CBF 0%, #A07DE0 100%)",
+                  border: saved ? "1px solid rgba(52,211,153,0.35)" : "none",
                   borderRadius: "14px",
-                  color: "#fff",
+                  color: saved ? "#34D399" : "#fff",
                   paddingLeft: "24px",
                   paddingRight: "24px",
                   width: "40%",
                   boxShadow: "none",
+                  transition: "background 0.2s ease, color 0.2s ease, border 0.2s ease",
                 }}
               >
-                Zapisz wpis
+                {saved ? "Zapisano ✓" : "Zapisz wpis"}
               </button>
             </>
           );
