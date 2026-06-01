@@ -18,8 +18,10 @@ export default function BottomNav() {
       <nav
         className="pointer-events-auto flex justify-around items-center gap-1 px-2 py-2 rounded-[26px] border border-white/10 backdrop-blur-2xl"
         style={{
-          background: "rgba(20,17,38,0.72)",
-          boxShadow: "0 8px 30px rgba(0,0,0,0.45)",
+          background:
+            "linear-gradient(180deg, rgba(45,33,79,0.88) 0%, rgba(26,20,48,0.9) 100%)",
+          boxShadow:
+            "0 8px 30px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06)",
         }}
       >
         {NAV_ITEMS.map(({ href, label, Icon }) => {
