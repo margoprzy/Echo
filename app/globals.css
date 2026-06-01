@@ -183,24 +183,27 @@
   animation: echo-slide-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Springy icon bounce — Revolut-style tap feedback */
+/* Playful icon wiggle — Revolut-style tap feedback */
 @keyframes echo-nav-bounce {
   0% {
-    transform: scale(1);
+    transform: translateY(0) rotate(0deg) scale(1);
   }
-  35% {
-    transform: scale(0.82);
+  20% {
+    transform: translateY(-3px) rotate(-9deg) scale(1.08);
+  }
+  45% {
+    transform: translateY(0) rotate(7deg) scale(1.05);
   }
   70% {
-    transform: scale(1.18);
+    transform: translateY(0) rotate(-4deg) scale(1.02);
   }
   100% {
-    transform: scale(1);
+    transform: translateY(0) rotate(0deg) scale(1);
   }
 }
 
 .echo-nav-bounce {
-  animation: echo-nav-bounce 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: echo-nav-bounce 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
