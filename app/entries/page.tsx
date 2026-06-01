@@ -16,7 +16,7 @@ export default function EntriesPage() {
 
   return (
     <div className="px-5 pt-12 pb-6">
-      <div className="mb-6">
+      <div className="mb-6 echo-enter">
         <h1 className="text-2xl font-semibold text-white tracking-tight">Wpisy</h1>
         <p className="text-sm text-white/40 mt-0.5">
           {entries.length === 0
@@ -26,7 +26,7 @@ export default function EntriesPage() {
       </div>
 
       {entries.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-4 echo-pop">
           <div className="w-16 h-16 rounded-full bg-[#7C5CBF]/10 border border-[#7C5CBF]/20 flex items-center justify-center">
             <PenLine size={24} className="text-[#7C5CBF]" />
           </div>
@@ -46,8 +46,14 @@ export default function EntriesPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {entries.map((entry) => (
-            <EntryCard key={entry.id} entry={entry} />
+          {entries.map((entry, i) => (
+            <div
+              key={entry.id}
+              className="echo-enter"
+              style={{ ["--enter-delay" as string]: `${60 + i * 55}ms` }}
+            >
+              <EntryCard entry={entry} />
+            </div>
           ))}
         </div>
       )}

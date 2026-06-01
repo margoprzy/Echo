@@ -101,7 +101,7 @@ export default function EntryDetailPage() {
       )}
 
       {/* Date */}
-      <div>
+      <div className="echo-enter">
         <p className="text-[#A07DE0] text-sm capitalize">{formatDate(entry.date)}</p>
         <p className="text-white/30 text-xs mt-0.5">{formatTime(entry.date)}</p>
       </div>
@@ -116,7 +116,8 @@ export default function EntryDetailPage() {
 
       {/* Content */}
       <div
-        className="prose prose-invert max-w-none text-white/85 text-[16px] leading-relaxed"
+        className="prose prose-invert max-w-none text-white/85 text-[16px] leading-relaxed echo-enter"
+        style={{ ["--enter-delay" as string]: "90ms" }}
         dangerouslySetInnerHTML={{ __html: entry.content }}
       />
     </div>

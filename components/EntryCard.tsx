@@ -25,7 +25,7 @@ export default function EntryCard({ entry }: EntryCardProps) {
   return (
     <Link
       href={`/entries/${entry.id}`}
-      className="flex gap-3 p-4 rounded-[20px] border border-white/10 bg-white/[0.055] hover:bg-white/[0.09] transition-colors"
+      className="flex gap-3 p-4 rounded-[20px] border border-white/10 bg-white/[0.055] hover:bg-white/[0.09] hover:-translate-y-0.5 hover:border-white/20 active:scale-[0.985] transition-all duration-200"
     >
       <div className="flex-1 min-w-0">
         <p className="text-xs text-[#A07DE0] mb-1.5 capitalize">{formatDate(entry.date)}</p>

@@ -24,7 +24,7 @@ function NameSetupModal({ onDone }: { onDone: (name: string) => void }) {
       style={{ background: "rgba(7,5,26,0.75)", backdropFilter: "blur(10px)" }}
     >
       <div
-        className="w-full max-w-sm p-6 rounded-[28px] border border-white/10 space-y-5"
+        className="w-full max-w-sm p-6 rounded-[28px] border border-white/10 space-y-5 echo-sheet"
         style={{ background: "#110E24" }}
       >
         <div>
@@ -227,7 +227,7 @@ function WriteContent() {
       <div className="px-5 pt-10 pb-6">
 
         {/* Header: greeting + date below */}
-        <div className="mb-8">
+        <div className="mb-8 echo-enter">
           <h1 className="text-[28px] font-bold tracking-tight leading-tight text-white">
             Cześć {userName ?? "..."}
           </h1>
@@ -243,13 +243,14 @@ function WriteContent() {
               setQuestion((prev) => getRandomQuestion(prev ?? undefined));
               setTimeout(() => (document.querySelector(".ProseMirror") as HTMLElement)?.focus(), 80);
             }}
-            className="w-full mb-4 text-left text-[14px] leading-relaxed flex items-center justify-between gap-3 hover:bg-white/[0.06] active:scale-[0.98] transition-all"
+            className="w-full mb-4 text-left text-[14px] leading-relaxed flex items-center justify-between gap-3 hover:bg-white/[0.06] active:scale-[0.98] transition-all echo-enter"
             style={{
               background: "rgba(124,92,191,0.09)",
               border: "1px solid rgba(124,92,191,0.2)",
               borderRadius: "16px",
               color: "#ffffff",
               padding: "14px 12px 14px 12px",
+              ["--enter-delay" as string]: "90ms",
             }}
           >
             <span>{question}</span>
@@ -261,12 +262,13 @@ function WriteContent() {
               setQuestion(getRandomQuestion());
               setTimeout(() => (document.querySelector(".ProseMirror") as HTMLElement)?.focus(), 80);
             }}
-            className="mb-4 text-[14px] font-medium text-white text-left leading-relaxed flex items-center gap-2 hover:bg-white/[0.06] active:scale-[0.98] transition-all"
+            className="mb-4 text-[14px] font-medium text-white text-left leading-relaxed flex items-center gap-2 hover:bg-white/[0.06] active:scale-[0.98] transition-all echo-enter"
             style={{
               background: "rgba(124,92,191,0.10)",
               border: "1px solid rgba(124,92,191,0.30)",
               borderRadius: "16px",
               padding: "14px 16px 14px 12px",
+              ["--enter-delay" as string]: "90ms",
             }}
           >
             <Sparkles size={15} style={{ color: "#A07DE0", flexShrink: 0 }} />
@@ -277,9 +279,10 @@ function WriteContent() {
         {/* Editor — collapsed or open */}
         {isEditorOpen ? (
           <div
-            className="relative px-4 pt-5 pb-5 rounded-[20px] border border-white/20 mb-4"
+            className="relative px-4 pt-5 pb-5 rounded-[20px] border border-white/20 mb-4 echo-enter"
             style={{
               background: "#0F0C21",
+              ["--enter-delay" as string]: "150ms",
             }}
           >
             <EntryEditor
