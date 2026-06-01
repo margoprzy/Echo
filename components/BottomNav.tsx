@@ -28,7 +28,7 @@ export default function BottomNav() {
               className={
                 active
                   ? "text-[#A07DE0] drop-shadow-[0_0_8px_rgba(160,125,224,0.7)]"
-                  : "text-white/40"
+                  : "text-[#A07DE0]"
               }
             />
             <span
