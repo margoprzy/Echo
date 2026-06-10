@@ -73,12 +73,17 @@ export function requireToken(req: Request): { tokenHash: string } | { response: 
 }
 
 /** Mapuje błąd z funkcji Postgres na odpowiedź HTTP. Nieważny token → 401. */
-export function mapDbError(error: { message?: string; code?: string }): Response {
+export function mapDbError(error: { message?: string; code?: string; details?: string; hint?: string }): Response {
   const msg = error.message ?? "";
   if (msg.includes("invalid_api_key") || error.code === "28000") {
     return apiError("invalid_token", "Nieprawidłowy lub odwołany token API.", 401);
   }
-  return apiError("server_error", "Błąd serwera podczas przetwarzania żądania.", 500);
+  // DIAGNOSTYKA (tymczasowo): ujawnij prawdziwy komunikat, żeby zdiagnozować 500 na produkcji.
+  console.error("mapDbError:", JSON.stringify(error));
+  return json(
+    { error: { code: "server_error", message: "Błąd serwera.", _debug: { message: error.message, code: error.code, details: error.details, hint: error.hint } } },
+    500
+  );
 }
 
 /** Prosty plain-text → HTML (akapity), żeby wpis ładnie wyświetlił się w Echo. */
