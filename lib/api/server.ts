@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { cleanEnv } from "@/lib/supabase";
 
 /**
  * Wspólne narzędzia dla publicznego API Echo (route handlers w `app/api/v1`).
@@ -13,8 +14,8 @@ let cached: SupabaseClient | null = null;
 export function db(): SupabaseClient {
   if (cached) return cached;
   cached = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL),
+    cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
     { auth: { persistSession: false, autoRefreshToken: false } }
   );
   return cached;
@@ -73,17 +74,13 @@ export function requireToken(req: Request): { tokenHash: string } | { response: 
 }
 
 /** Mapuje błąd z funkcji Postgres na odpowiedź HTTP. Nieważny token → 401. */
-export function mapDbError(error: { message?: string; code?: string; details?: string; hint?: string }): Response {
+export function mapDbError(error: { message?: string; code?: string }): Response {
   const msg = error.message ?? "";
   if (msg.includes("invalid_api_key") || error.code === "28000") {
     return apiError("invalid_token", "Nieprawidłowy lub odwołany token API.", 401);
   }
-  // DIAGNOSTYKA (tymczasowo): ujawnij prawdziwy komunikat, żeby zdiagnozować 500 na produkcji.
   console.error("mapDbError:", JSON.stringify(error));
-  return json(
-    { error: { code: "server_error", message: "Błąd serwera.", _debug: { message: error.message, code: error.code, details: error.details, hint: error.hint } } },
-    500
-  );
+  return apiError("server_error", "Błąd serwera podczas przetwarzania żądania.", 500);
 }
 
 /** Prosty plain-text → HTML (akapity), żeby wpis ładnie wyświetlił się w Echo. */
