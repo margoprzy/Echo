@@ -2,16 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PenLine, BookOpen, CalendarDays } from "lucide-react";
+import { PenLine, CalendarDays, Bot, UserCircle2, FileText } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/write", label: "Pisz", Icon: PenLine },
-  { href: "/entries", label: "Wpisy", Icon: BookOpen },
   { href: "/calendar", label: "Kalendarz", Icon: CalendarDays },
+  { href: "/ai", label: "Analiza AI", Icon: Bot },
+  { href: "/docs", label: "API / Dokumentacja", Icon: FileText },
+  { href: "/profile", label: "Profil", Icon: UserCircle2 },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+
+  if (pathname === "/login") return null;
 
   return (
     <aside

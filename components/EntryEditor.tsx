@@ -17,6 +17,8 @@ interface EntryEditorProps {
   onUpdate: (html: string) => void;
   reset?: number;
   initialContent?: string;
+  insertText?: string | null;
+  onInsertHandled?: () => void;
 }
 
 function ToolbarButton({
@@ -105,6 +107,8 @@ export default function EntryEditor({
   onUpdate,
   reset,
   initialContent,
+  insertText,
+  onInsertHandled,
 }: EntryEditorProps) {
   const [isEmpty, setIsEmpty] = useState(!initialContent);
   const [isFocused, setIsFocused] = useState(false);
@@ -116,7 +120,7 @@ export default function EntryEditor({
     editorProps: {
       attributes: {
         class:
-          "min-h-[220px] outline-none text-white/90 text-[16px] leading-relaxed prose prose-invert max-w-none",
+          "min-h-[96px] outline-none text-white/90 text-[16px] leading-relaxed prose prose-invert max-w-none",
       },
     },
     onUpdate: ({ editor }) => {
@@ -142,6 +146,12 @@ export default function EntryEditor({
       setIsEmpty(true);
     }
   }, [reset, editor]);
+
+  useEffect(() => {
+    if (!editor || !insertText) return;
+    editor.chain().focus().insertContent(insertText).run();
+    onInsertHandled?.();
+  }, [insertText, editor, onInsertHandled]);
 
   return (
     <div>

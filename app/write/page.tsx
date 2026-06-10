@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import EntryEditor from "@/components/EntryEditor";
+import VoiceRecorder from "@/components/VoiceRecorder";
 import { saveEntry, getEntries, getUserName, setUserName } from "@/lib/storage";
 import { getRandomQuestion } from "@/lib/questions";
 import type { Entry } from "@/lib/types";
@@ -91,23 +92,32 @@ function WriteContent() {
   const [userName, setUserNameState] = useState<string | null>(null);
   const [showNameSetup, setShowNameSetup] = useState(false);
   const [question, setQuestion] = useState<string | null>(null);
+  const [pendingTranscript, setPendingTranscript] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    let cancelled = false;
     const name = getUserName();
-    if (editId) {
-      const found = getEntries().find((e) => e.id === editId);
-      if (found) {
-        setExistingEntry(found);
-        setContent(found.content);
-        setPhotoUrl(found.photoUrl);
-        setIsEditorOpen(true);
-      }
-    } else if (!name) {
-      setShowNameSetup(true);
-    }
     setUserNameState(name);
-    setInitialized(true);
+    if (editId) {
+      getEntries().then((rows) => {
+        if (cancelled) return;
+        const found = rows.find((e) => e.id === editId);
+        if (found) {
+          setExistingEntry(found);
+          setContent(found.content);
+          setPhotoUrl(found.photoUrl);
+          setIsEditorOpen(true);
+        }
+        setInitialized(true);
+      });
+    } else {
+      if (!name) setShowNameSetup(true);
+      setInitialized(true);
+    }
+    return () => {
+      cancelled = true;
+    };
   }, [editId]);
 
   function handleNameDone(name: string) {
@@ -124,14 +134,14 @@ function WriteContent() {
     reader.readAsDataURL(file);
   }
 
-  function handleSave() {
+  async function handleSave(destination: "entries" | "ai" = "entries") {
     const text = content.replace(/<[^>]*>/g, "").trim();
     if (!text && !photoUrl) return;
     setSaving(true);
     const entry: Entry = existingEntry
       ? { ...existingEntry, content, photoUrl }
       : { id: crypto.randomUUID(), date: new Date().toISOString(), content, photoUrl };
-    saveEntry(entry);
+    await saveEntry(entry);
     setSaved(true);
     setTimeout(() => {
       setContent("");
@@ -141,7 +151,9 @@ function WriteContent() {
       setQuestion(null);
       setSaving(false);
       setSaved(false);
-      if (existingEntry) {
+      if (destination === "ai") {
+        router.push(`/ai?entry=${entry.id}`);
+      } else if (existingEntry) {
         router.push(`/entries/${existingEntry.id}`);
       } else {
         router.push("/entries");
@@ -156,7 +168,7 @@ function WriteContent() {
   /* ── EDIT MODE ─────────────────────────────────────────────────── */
   if (isEditing) {
     return (
-      <div className="px-5 pt-12 pb-6 space-y-4">
+      <div className="px-5 pt-4 md:pt-12 pb-6 space-y-4">
         <div className="mb-2">
           <h1 className="text-2xl font-semibold text-white tracking-tight">Edytuj wpis</h1>
           <p className="text-sm text-[#A07DE0] mt-0.5 capitalize">
@@ -208,7 +220,7 @@ function WriteContent() {
 
         <div className="h-4" />
         <button
-          onClick={handleSave}
+          onClick={() => handleSave()}
           disabled={saving}
           className="w-full py-3.5 rounded-full font-semibold text-white text-sm disabled:opacity-50"
           style={{ background: "linear-gradient(135deg, #7C5CBF 0%, #A07DE0 100%)" }}
@@ -224,7 +236,7 @@ function WriteContent() {
     <>
       {showNameSetup && <NameSetupModal onDone={handleNameDone} />}
 
-      <div className="px-5 pt-10 pb-6">
+      <div className="px-5 pt-4 md:pt-10 pb-6">
 
         {/* Header: greeting + date below */}
         <div className="mb-8 echo-enter">
@@ -288,7 +300,12 @@ function WriteContent() {
               placeholder="Zanotuj swój dzień..."
               onUpdate={setContent}
               reset={resetKey}
+              insertText={pendingTranscript}
+              onInsertHandled={() => setPendingTranscript(null)}
             />
+            <div className="absolute" style={{ bottom: "16px", right: "16px" }}>
+              <VoiceRecorder onTranscript={(text) => setPendingTranscript(text)} />
+            </div>
           </div>
         ) : (
           <button
@@ -331,26 +348,29 @@ function WriteContent() {
           return (
             <>
               <div className="h-6" />
-              <button
-                onClick={handleSave}
-                disabled={saving || saved}
-                className="block mx-auto py-3.5 font-semibold text-sm active:scale-[0.98] transition-all"
-                style={{
-                  background: saved
-                    ? "linear-gradient(135deg, #7C5CBF 0%, #A07DE0 100%)"
-                    : "rgba(160,125,224,0.18)",
-                  border: saved ? "none" : "1px solid rgba(160,125,224,0.45)",
-                  borderRadius: "14px",
-                  color: saved ? "#fff" : "#C4A8FF",
-                  paddingLeft: "24px",
-                  paddingRight: "24px",
-                  width: "40%",
-                  boxShadow: "none",
-                  transition: "background 0.2s ease, color 0.2s ease, border 0.2s ease",
-                }}
-              >
-                {saved ? "Zapisano" : "Zapisz wpis"}
-              </button>
+              {/* Dwie ścieżki: AI wyróżnione, zwykły zapis obok. Węższe, wyśrodkowane. */}
+              <div className="flex flex-col md:flex-row items-center justify-center gap-2.5 md:gap-3">
+                {/* Główny — zapisz i analiza AI */}
+                <button
+                  onClick={() => handleSave("ai")}
+                  disabled={saving || saved}
+                  className="px-6 py-2.5 rounded-[14px] font-semibold text-sm text-white transition-all duration-150 active:scale-[0.96] active:brightness-90 md:hover:brightness-110 disabled:opacity-60"
+                  style={{
+                    background: "linear-gradient(135deg, #7C5CBF 0%, #A07DE0 100%)",
+                    boxShadow: "0 8px 22px rgba(124,92,191,0.30)",
+                  }}
+                >
+                  {saved ? "Zapisano" : "Analizuj z AI"}
+                </button>
+                {/* Drugorzędny — zwykły zapis */}
+                <button
+                  onClick={() => handleSave("entries")}
+                  disabled={saving || saved}
+                  className="px-6 py-2.5 rounded-[14px] font-medium text-sm text-[#C4A8FF] bg-white/[0.04] border border-[#A07DE0]/40 transition-all duration-150 active:scale-[0.96] active:bg-white/[0.12] md:hover:bg-white/[0.09] md:hover:border-[#A07DE0]/70 disabled:opacity-60"
+                >
+                  Zapisz wpis
+                </button>
+              </div>
             </>
           );
         })()}
