@@ -23,6 +23,25 @@ function isWithinRecentDays(iso: string, ref: Date, days: number): boolean {
   return d >= cutoff && d <= ref.getTime();
 }
 
+/**
+ * Z kompletu wpisów wylicza kontekst rozmowy:
+ * - contextEntry: kliknięty wpis (oś, do banera/auto-startu),
+ * - dayEntries: WSZYSTKIE wpisy z dnia tego wpisu (krótkie myśli z całego dnia),
+ * - recentEntries: tło z ostatnich 30 dni, z pominięciem analizowanego dnia.
+ */
+function computeContext(rows: Entry[], entryId: string | null) {
+  const contextEntry = entryId ? rows.find((e) => e.id === entryId) ?? null : null;
+  const focalDay = contextEntry ? contextEntry.date.slice(0, 10) : null;
+  const now = new Date();
+  const dayEntries = focalDay
+    ? rows.filter((e) => e.date.slice(0, 10) === focalDay)
+    : [];
+  const recentEntries = rows.filter(
+    (e) => isWithinRecentDays(e.date, now, RECENT_DAYS) && e.date.slice(0, 10) !== focalDay
+  );
+  return { contextEntry, dayEntries, recentEntries };
+}
+
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("pl-PL", {
     weekday: "long",
@@ -49,13 +68,13 @@ function AiContent() {
   const mode: "entry" | "general" = entryId ? "entry" : "general";
 
   const [contextEntry, setContextEntry] = useState<Entry | null>(null);
-  const [recentEntries, setRecentEntries] = useState<Entry[]>([]);
+  const [dayCount, setDayCount] = useState(0);
   const [ready, setReady] = useState(false);
   const [input, setInput] = useState("");
 
-  // Kontekst dla każdego żądania (wpis dnia + ostatnie 30 dni) — wstrzykiwany przez transport.
-  const ctxRef = useRef<{ contextEntry: Entry | null; recentEntries: Entry[] }>({
-    contextEntry: null,
+  // Kontekst dla każdego żądania (wszystkie wpisy dnia + ostatnie 30 dni) — wstrzykiwany przez transport.
+  const ctxRef = useRef<{ dayEntries: Entry[]; recentEntries: Entry[] }>({
+    dayEntries: [],
     recentEntries: [],
   });
   const conversationIdRef = useRef<string | null>(null);
@@ -70,7 +89,7 @@ function AiContent() {
         prepareSendMessagesRequest: ({ messages }) => ({
           body: {
             messages,
-            contextEntry: ctxRef.current.contextEntry,
+            dayEntries: ctxRef.current.dayEntries,
             recentEntries: ctxRef.current.recentEntries,
           },
         }),
@@ -97,13 +116,11 @@ function AiContent() {
     (async () => {
       const rows = await getEntries();
       if (cancelled) return;
-      const now = new Date();
-      const recent = rows.filter((e) => isWithinRecentDays(e.date, now, RECENT_DAYS));
-      const ctx = entryId ? rows.find((e) => e.id === entryId) ?? null : null;
+      const c = computeContext(rows, entryId);
 
-      setRecentEntries(recent);
-      setContextEntry(ctx);
-      ctxRef.current = { contextEntry: ctx, recentEntries: recent };
+      setContextEntry(c.contextEntry);
+      setDayCount(c.dayEntries.length);
+      ctxRef.current = { dayEntries: c.dayEntries, recentEntries: c.recentEntries };
 
       const convId = await getOrCreateConversation(mode, entryId);
       if (cancelled) return;
@@ -129,7 +146,12 @@ function AiContent() {
     if (!ready || autoStartedRef.current) return;
     if (mode === "entry" && contextEntry && messages.length === 0) {
       autoStartedRef.current = true;
-      send(`Przeanalizuj proszę mój wpis z ${formatDate(contextEntry.date)}.`);
+      const label = formatDate(contextEntry.date);
+      send(
+        dayCount > 1
+          ? `Przeanalizuj proszę moje wpisy z ${label}.`
+          : `Przeanalizuj proszę mój wpis z ${label}.`
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, contextEntry, mode, messages.length]);
@@ -151,9 +173,19 @@ function AiContent() {
     (text) => setInput((m) => (m ? m + text : text))
   );
 
-  function send(text: string) {
+  async function send(text: string) {
     const trimmed = text.trim();
     if (!trimmed || isBusy) return;
+    // Odśwież kontekst najświeższymi wpisami — łapie nowo dodane wpisy z tego samego dnia.
+    try {
+      const rows = await getEntries();
+      const c = computeContext(rows, entryId);
+      ctxRef.current = { dayEntries: c.dayEntries, recentEntries: c.recentEntries };
+      setContextEntry(c.contextEntry);
+      setDayCount(c.dayEntries.length);
+    } catch {
+      // jeśli odświeżenie się nie uda, używamy poprzedniego kontekstu
+    }
     const convId = conversationIdRef.current;
     if (convId) appendMessage(convId, "user", trimmed);
     sendMessage({ text: trimmed });
@@ -195,7 +227,9 @@ function AiContent() {
           }}
         >
           <div className="min-w-0">
-            <p className="text-[11px] text-white/40 uppercase tracking-wide">Analizujesz wpis</p>
+            <p className="text-[11px] text-white/40 uppercase tracking-wide">
+              {dayCount > 1 ? "Analizujesz dzień" : "Analizujesz wpis"}
+            </p>
             <p className="text-sm text-white/90 capitalize truncate">
               {formatDate(contextEntry.date)}
             </p>

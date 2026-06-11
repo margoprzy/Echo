@@ -9,7 +9,8 @@ export const maxDuration = 60;
 
 interface FreudRequest {
   messages: UIMessage[];
-  contextEntry?: Entry | null;
+  dayEntries?: Entry[]; // wszystkie wpisy z analizowanego dnia
+  contextEntry?: Entry | null; // kompatybilność wsteczna (pojedynczy wpis)
   recentEntries?: Entry[];
 }
 
@@ -29,13 +30,20 @@ export async function POST(req: Request) {
     return Response.json({ error: "Nieprawidłowe żądanie." }, { status: 400 });
   }
 
-  const { messages, contextEntry = null, recentEntries = [] } = body;
+  const { messages, dayEntries, contextEntry = null, recentEntries = [] } = body;
   if (!Array.isArray(messages)) {
     return Response.json({ error: "Brak wiadomości." }, { status: 400 });
   }
 
+  // Wpisy dnia: preferuj pełną listę; fallback do pojedynczego wpisu (stare klienty).
+  const focalDay = Array.isArray(dayEntries) && dayEntries.length > 0
+    ? dayEntries
+    : contextEntry
+    ? [contextEntry]
+    : [];
+
   const xai = createXai({ apiKey });
-  const system = `${FREUD.systemPrompt}\n\n${buildContextBlock(contextEntry, recentEntries)}`;
+  const system = `${FREUD.systemPrompt}\n\n${buildContextBlock(focalDay, recentEntries)}`;
 
   const result = streamText({
     model: xai("grok-4-1-fast-reasoning"),

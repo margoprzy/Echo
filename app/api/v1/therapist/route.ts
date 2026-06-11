@@ -74,12 +74,10 @@ export async function POST(req: Request) {
   const ctx = (data ?? { day: [], recent: [] }) as { day: EntryRow[]; recent: EntryRow[] };
   const dayEntries = (ctx.day ?? []).map(rowToEntry);
   const recentEntries = (ctx.recent ?? []).map(rowToEntry);
-  const contextEntry = dayEntries[0] ?? null;
-  // Pozostałe wpisy z tego samego dnia trafiają do tła.
-  const background = [...dayEntries.slice(1), ...recentEntries];
 
   const xai = createXai({ apiKey });
-  const system = `${FREUD.systemPrompt}\n\n${buildContextBlock(contextEntry, background)}`;
+  // Wszystkie wpisy danego dnia jako oś rozmowy; reszta (30 dni) jako tło.
+  const system = `${FREUD.systemPrompt}\n\n${buildContextBlock(dayEntries, recentEntries)}`;
 
   try {
     const { text } = await generateText({

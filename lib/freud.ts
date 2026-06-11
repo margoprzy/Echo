@@ -73,7 +73,7 @@ NA CZYM PRACUJESZ:
 - Otrzymujesz fragmenty dziennika jako KONTEKST — to prawdziwe zapiski tej osoby. Traktuj je z powagą i dyskrecją. Interpretuj wyłącznie to, co napisano; nie zmyślaj faktów. Czego brakuje — zapytaj.
 
 TRYBY ROZMOWY:
-- "analiza wpisu": gdy w kontekście jest WPIS DNIA, skup się na nim; starsze zapiski to tło. Zacznij od krótkiej, trafnej obserwacji, potem zaproś do rozmowy.
+- "analiza wpisu": gdy w kontekście są WPISY DNIA, skup się na nich (w jednym dniu może być kilka różnych myśli — potraktuj je łącznie jako zapis tego samego dnia); starsze zapiski to tło. Zacznij od krótkiej, trafnej obserwacji, potem zaproś do rozmowy.
 - "ogólny": gdy nie ma wpisu dnia, odpowiadaj na pytania w oparciu o zapiski z ostatnich tygodni — wskazuj wzorce i powracające motywy.
 - Gdy zapisków brak lub są bardzo skąpe, łagodnie zachęć do pisania dziennika.
 
@@ -85,27 +85,46 @@ Co zostało po drugiej stronie tych drzwi?"
 ${SAFETY_RULES}`,
 };
 
+function formatEntryTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
+}
+
 /**
  * Buduje blok kontekstu (czysty tekst) wstrzykiwany do promptu systemowego:
- * wyróżniony wpis dnia (jeśli jest) + tło z ostatnich N dni.
+ * WSZYSTKIE wpisy z analizowanego dnia (oś rozmowy) + tło z ostatnich N dni.
+ *
+ * `dayEntries` to komplet wpisów z jednego dnia (może być ich kilka — krótkie myśli
+ * z całego dnia). Renderujemy je chronologicznie i traktujemy łącznie.
  */
 export function buildContextBlock(
-  contextEntry: Entry | null,
+  dayEntries: Entry[],
   recentEntries: Entry[]
 ): string {
   const parts: string[] = [];
 
-  if (contextEntry) {
-    parts.push(
-      `=== WPIS DNIA (oś tej rozmowy) ===\n` +
-        `Data: ${formatEntryDate(contextEntry.date)}\n\n` +
-        (htmlToPlainText(contextEntry.content) || "(wpis jest pusty)")
+  if (dayEntries.length > 0) {
+    // chronologicznie (od rana) — myśli z całego dnia czytane po kolei
+    const ordered = [...dayEntries].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
+    const dateLabel = formatEntryDate(ordered[0].date);
+    const multi = ordered.length > 1;
+    const rendered = ordered
+      .map((e, i) => {
+        const text = htmlToPlainText(e.content) || "(pusty wpis)";
+        return multi ? `— wpis ${i + 1} (${formatEntryTime(e.date)}) —\n${text}` : text;
+      })
+      .join("\n\n");
+    const header = multi
+      ? `=== WPISY DNIA (oś tej rozmowy) — ${dateLabel} ===\n` +
+        `(Tego dnia zapisano ${ordered.length} wpisy/wpisów; potraktuj je łącznie jako myśli z jednego dnia.)`
+      : `=== WPIS DNIA (oś tej rozmowy) — ${dateLabel} ===`;
+    parts.push(`${header}\n\n${rendered}`);
   }
 
-  const background = recentEntries
-    .filter((e) => !contextEntry || e.id !== contextEntry.id)
-    .slice(0, 60);
+  // Tło: pozostałe zapiski (z wykluczeniem wpisów dnia, gdyby się powtórzyły).
+  const dayIds = new Set(dayEntries.map((e) => e.id));
+  const background = recentEntries.filter((e) => !dayIds.has(e.id)).slice(0, 60);
 
   if (background.length > 0) {
     const rendered = background

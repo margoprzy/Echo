@@ -125,11 +125,10 @@ export async function askTherapist(
   };
   const dayEntries = (ctx.day ?? []).map(rowToEntry);
   const recentEntries = (ctx.recent ?? []).map(rowToEntry);
-  const contextEntry = dayEntries[0] ?? null;
-  const background = [...dayEntries.slice(1), ...recentEntries];
 
   const xai = createXai({ apiKey });
-  const system = `${FREUD.systemPrompt}\n\n${buildContextBlock(contextEntry, background)}`;
+  // Wszystkie wpisy danego dnia jako oś rozmowy; reszta (30 dni) jako tło.
+  const system = `${FREUD.systemPrompt}\n\n${buildContextBlock(dayEntries, recentEntries)}`;
 
   try {
     const { text } = await generateText({

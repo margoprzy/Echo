@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Flame } from "lucide-react";
 import type { Entry } from "@/lib/types";
 
 interface ActivityCalendarProps {
   entries: Entry[];
+  selectedDay?: string | null;
+  onSelectDay?: (dateStr: string) => void;
 }
 
 const WEEKDAYS = ["Pn", "Wt", "Śr", "Cz", "Pt", "So", "Nd"];
@@ -33,8 +34,7 @@ function calcStreak(entries: Entry[]): number {
   return streak;
 }
 
-export default function ActivityCalendar({ entries }: ActivityCalendarProps) {
-  const router = useRouter();
+export default function ActivityCalendar({ entries, selectedDay, onSelectDay }: ActivityCalendarProps) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth()); // 0-indexed
@@ -118,21 +118,20 @@ export default function ActivityCalendar({ entries }: ActivityCalendarProps) {
             const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
             const hasEntry = activeDays.has(dateStr);
             const isToday = dateStr === today;
-            const entry = hasEntry
-              ? entries.find((e) => e.date.slice(0, 10) === dateStr)
-              : null;
+            const isSelected = dateStr === selectedDay;
 
             return (
               <div key={i} className="flex items-center justify-center py-0.5">
                 <div
-                  onClick={() => entry && router.push(`/entries/${entry.id}`)}
+                  onClick={() => hasEntry && onSelectDay?.(dateStr)}
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-xs transition-colors
                     ${hasEntry
                       ? "bg-[#7C5CBF] text-white font-semibold cursor-pointer hover:bg-[#9370DB] active:scale-95"
                       : isToday
                       ? "border border-[#7C5CBF] text-white/80"
                       : "text-white/40"
-                    }`}
+                    }
+                    ${isSelected ? "ring-2 ring-[#C4A8FF] ring-offset-2 ring-offset-[#15122b]" : ""}`}
                 >
                   {dayNum}
                 </div>
