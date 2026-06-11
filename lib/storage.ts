@@ -149,14 +149,3 @@ export async function appendMessage(
     .update({ updated_at: new Date().toISOString() })
     .eq("id", conversationId);
 }
-
-const NAME_KEY = "echo_user_name";
-
-export function getUserName(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(NAME_KEY);
-}
-
-export function setUserName(name: string): void {
-  localStorage.setItem(NAME_KEY, name);
-}

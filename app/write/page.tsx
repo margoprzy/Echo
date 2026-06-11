@@ -5,8 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import EntryEditor from "@/components/EntryEditor";
 import VoiceRecorder from "@/components/VoiceRecorder";
-import { saveEntry, getEntries, getUserName, setUserName } from "@/lib/storage";
+import { saveEntry, getEntries } from "@/lib/storage";
 import { getRandomQuestion } from "@/lib/questions";
+import { useAuth } from "@/components/AuthProvider";
+import { supabase } from "@/lib/supabase";
 import type { Entry } from "@/lib/types";
 
 function todayLabel(): string {
@@ -80,6 +82,7 @@ function WriteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
+  const { session } = useAuth();
 
   const [existingEntry, setExistingEntry] = useState<Entry | null>(null);
   const [initialized, setInitialized] = useState(false);
@@ -97,8 +100,6 @@ function WriteContent() {
 
   useEffect(() => {
     let cancelled = false;
-    const name = getUserName();
-    setUserNameState(name);
     if (editId) {
       getEntries().then((rows) => {
         if (cancelled) return;
@@ -112,7 +113,6 @@ function WriteContent() {
         setInitialized(true);
       });
     } else {
-      if (!name) setShowNameSetup(true);
       setInitialized(true);
     }
     return () => {
@@ -120,10 +120,19 @@ function WriteContent() {
     };
   }, [editId]);
 
-  function handleNameDone(name: string) {
-    setUserName(name);
+  // Imię jest powiązane z KONTEM (Supabase user metadata), nie z przeglądarką.
+  // Nowe konto nie ma jeszcze imienia → pokazujemy ekran wpisania imienia.
+  useEffect(() => {
+    if (editId || !session) return;
+    const name = (session.user?.user_metadata?.name as string | undefined) ?? null;
+    setUserNameState(name);
+    setShowNameSetup(!name);
+  }, [session, editId]);
+
+  async function handleNameDone(name: string) {
     setUserNameState(name);
     setShowNameSetup(false);
+    await supabase.auth.updateUser({ data: { name } });
   }
 
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
