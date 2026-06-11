@@ -1,6 +1,7 @@
 import { createXai } from "@ai-sdk/xai";
 import { streamText, convertToModelMessages, type UIMessage } from "ai";
 import { FREUD, buildContextBlock } from "@/lib/freud";
+import { cleanEnv } from "@/lib/env";
 import type { Entry } from "@/lib/types";
 
 // Strumieniowanie odpowiedzi reasoning-modelu bywa dłuższe niż domyślny limit.
@@ -13,7 +14,7 @@ interface FreudRequest {
 }
 
 export async function POST(req: Request) {
-  const apiKey = process.env.XAI_API_KEY;
+  const apiKey = cleanEnv(process.env.XAI_API_KEY);
   if (!apiKey) {
     return Response.json(
       { error: "Brak klucza XAI_API_KEY po stronie serwera." },

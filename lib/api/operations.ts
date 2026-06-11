@@ -3,6 +3,7 @@ import { generateText } from "ai";
 import { FREUD, buildContextBlock, htmlToPlainText } from "@/lib/freud";
 import type { Entry } from "@/lib/types";
 import { db, plainTextToHtml } from "@/lib/api/server";
+import { cleanEnv } from "@/lib/env";
 
 /**
  * Współdzielona logika operacji Echo (token → RPC SECURITY DEFINER).
@@ -105,7 +106,7 @@ export async function askTherapist(
   if (!input.message || !input.message.trim()) {
     throw new ApiOpError("bad_request", "Pole 'message' jest wymagane (niepusty tekst).");
   }
-  const apiKey = process.env.XAI_API_KEY;
+  const apiKey = cleanEnv(process.env.XAI_API_KEY);
   if (!apiKey) {
     throw new ApiOpError("server_error", "Brak konfiguracji modelu AI po stronie serwera.");
   }
