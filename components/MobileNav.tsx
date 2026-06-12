@@ -25,9 +25,26 @@ const TITLES: Record<string, string> = {
 export default function MobileNav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     setOpen(false);
+  }, [pathname]);
+
+  // Tło paska pojawia się po rozpoczęciu przewijania, żeby tytuł nie zlewał się z treścią.
+  // Tryb capture łapie też przewijanie wewnętrznych kontenerów (np. czat w Analizie AI).
+  useEffect(() => {
+    function onScroll(e: Event) {
+      const t = e.target;
+      const top =
+        t instanceof HTMLElement && t !== document.documentElement && t !== document.body
+          ? t.scrollTop
+          : window.scrollY;
+      setScrolled(top > 6);
+    }
+    window.addEventListener("scroll", onScroll, true);
+    setScrolled(window.scrollY > 6);
+    return () => window.removeEventListener("scroll", onScroll, true);
   }, [pathname]);
 
   useEffect(() => {
@@ -52,7 +69,14 @@ export default function MobileNav() {
           style={{
             height: "calc(env(safe-area-inset-top, 0px) + 56px)",
             paddingTop: "env(safe-area-inset-top, 0px)",
-            background: "transparent",
+            background: scrolled ? "rgba(17,14,36,0.82)" : "transparent",
+            backdropFilter: scrolled ? "blur(12px)" : "none",
+            WebkitBackdropFilter: scrolled ? "blur(12px)" : "none",
+            borderBottom: scrolled
+              ? "1px solid rgba(255,255,255,0.07)"
+              : "1px solid transparent",
+            transition:
+              "background 0.25s ease, backdrop-filter 0.25s ease, border-color 0.25s ease",
           }}
         >
           <button
