@@ -2,13 +2,14 @@
 
 import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Sparkles } from "lucide-react";
+import { Sparkles, ImagePlus, X } from "lucide-react";
 import EntryEditor from "@/components/EntryEditor";
 import VoiceRecorder from "@/components/VoiceRecorder";
 import { saveEntry, getEntries } from "@/lib/storage";
 import { getRandomQuestion } from "@/lib/questions";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
+import { uploadPhotos, getSignedUrls, deletePhotos } from "@/lib/photos";
 import type { Entry } from "@/lib/types";
 
 function todayLabel(): string {
@@ -78,6 +79,58 @@ function NameSetupModal({ onDone }: { onDone: (name: string) => void }) {
   );
 }
 
+/** Pozioma galeria z miniaturkami (snap scroll) + przycisk usuwania. */
+function PhotoGallery({
+  items,
+  onRemove,
+  legacyDataUrl,
+  onRemoveLegacy,
+}: {
+  items: { path: string; url: string }[];
+  onRemove: (path: string) => void;
+  legacyDataUrl?: string;
+  onRemoveLegacy?: () => void;
+}) {
+  if (!items.length && !legacyDataUrl) return null;
+  return (
+    <div className="-mx-5 px-5 mb-4 overflow-x-auto echo-no-scrollbar">
+      <div className="flex gap-3 snap-x snap-mandatory pb-1">
+        {legacyDataUrl && (
+          <div className="relative shrink-0 snap-start w-[78%] max-w-[320px] aspect-[4/3] rounded-[16px] overflow-hidden border border-white/10">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={legacyDataUrl} alt="" className="w-full h-full object-cover" />
+            {onRemoveLegacy && (
+              <button
+                onClick={onRemoveLegacy}
+                aria-label="Usuń zdjęcie"
+                className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center bg-black/65 hover:bg-black/85 rounded-full text-white/80"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        )}
+        {items.map((it) => (
+          <div
+            key={it.path}
+            className="relative shrink-0 snap-start w-[78%] max-w-[320px] aspect-[4/3] rounded-[16px] overflow-hidden border border-white/10"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={it.url} alt="" className="w-full h-full object-cover" />
+            <button
+              onClick={() => onRemove(it.path)}
+              aria-label="Usuń zdjęcie"
+              className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center bg-black/65 hover:bg-black/85 rounded-full text-white/80"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function WriteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -87,7 +140,11 @@ function WriteContent() {
   const [existingEntry, setExistingEntry] = useState<Entry | null>(null);
   const [initialized, setInitialized] = useState(false);
   const [content, setContent] = useState("");
-  const [photoUrl, setPhotoUrl] = useState<string | undefined>();
+  const [photoPaths, setPhotoPaths] = useState<string[]>([]);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  // Stary format (jeden inline base64) — zachowywany przy edycji, nie tworzymy nowych.
+  const [legacyPhotoUrl, setLegacyPhotoUrl] = useState<string | undefined>();
+  const [uploading, setUploading] = useState(false);
   const [resetKey, setResetKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -97,17 +154,25 @@ function WriteContent() {
   const [question, setQuestion] = useState<string | null>(null);
   const [pendingTranscript, setPendingTranscript] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Ścieżki wgrane w tej sesji — przy anulowaniu/usunięciu trafią do bucketu śmieci.
+  const uploadedThisSession = useRef<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     if (editId) {
-      getEntries().then((rows) => {
+      getEntries().then(async (rows) => {
         if (cancelled) return;
         const found = rows.find((e) => e.id === editId);
         if (found) {
           setExistingEntry(found);
           setContent(found.content);
-          setPhotoUrl(found.photoUrl);
+          setLegacyPhotoUrl(found.photoUrl);
+          const paths = found.photoPaths ?? [];
+          setPhotoPaths(paths);
+          if (paths.length) {
+            const urls = await getSignedUrls(paths);
+            if (!cancelled) setSignedUrls(urls);
+          }
           setIsEditorOpen(true);
         }
         setInitialized(true);
@@ -120,8 +185,6 @@ function WriteContent() {
     };
   }, [editId]);
 
-  // Imię jest powiązane z KONTEM (Supabase user metadata), nie z przeglądarką.
-  // Nowe konto nie ma jeszcze imienia → pokazujemy ekran wpisania imienia.
   useEffect(() => {
     if (editId || !session) return;
     const name = (session.user?.user_metadata?.name as string | undefined) ?? null;
@@ -135,26 +198,62 @@ function WriteContent() {
     await supabase.auth.updateUser({ data: { name } });
   }
 
-  function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => setPhotoUrl(ev.target?.result as string);
-    reader.readAsDataURL(file);
+  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = ""; // pozwala wybrać te same pliki ponownie
+    if (!files.length) return;
+    setUploading(true);
+    const newPaths = await uploadPhotos(files);
+    if (newPaths.length) {
+      uploadedThisSession.current.push(...newPaths);
+      setPhotoPaths((prev) => [...prev, ...newPaths]);
+      const urls = await getSignedUrls(newPaths);
+      setSignedUrls((prev) => ({ ...prev, ...urls }));
+    }
+    setUploading(false);
+  }
+
+  function handleRemovePhoto(path: string) {
+    setPhotoPaths((prev) => prev.filter((p) => p !== path));
+    setSignedUrls((prev) => {
+      const next = { ...prev };
+      delete next[path];
+      return next;
+    });
+    // Jeśli zdjęcie zostało dodane w tej sesji i nie zapisane — wywal też z bucketu.
+    if (uploadedThisSession.current.includes(path)) {
+      uploadedThisSession.current = uploadedThisSession.current.filter((p) => p !== path);
+      void deletePhotos([path]);
+    }
   }
 
   async function handleSave(destination: "entries" | "ai" = "entries") {
     const text = content.replace(/<[^>]*>/g, "").trim();
-    if (!text && !photoUrl) return;
+    const hasPhoto = photoPaths.length > 0 || !!legacyPhotoUrl;
+    if (!text && !hasPhoto) return;
     setSaving(true);
     const entry: Entry = existingEntry
-      ? { ...existingEntry, content, photoUrl }
-      : { id: crypto.randomUUID(), date: new Date().toISOString(), content, photoUrl };
+      ? {
+          ...existingEntry,
+          content,
+          photoUrl: legacyPhotoUrl,
+          photoPaths: photoPaths.length ? photoPaths : undefined,
+        }
+      : {
+          id: crypto.randomUUID(),
+          date: new Date().toISOString(),
+          content,
+          photoPaths: photoPaths.length ? photoPaths : undefined,
+        };
     await saveEntry(entry);
+    // Zapisane: zdjęcia dodane w tej sesji już są w bazie — nie kasujemy ich z bucketu.
+    uploadedThisSession.current = [];
     setSaved(true);
     setTimeout(() => {
       setContent("");
-      setPhotoUrl(undefined);
+      setPhotoPaths([]);
+      setSignedUrls({});
+      setLegacyPhotoUrl(undefined);
       setResetKey((k) => k + 1);
       setIsEditorOpen(false);
       setQuestion(null);
@@ -171,6 +270,9 @@ function WriteContent() {
   }
 
   const isEditing = !!existingEntry;
+  const galleryItems = photoPaths
+    .map((p) => ({ path: p, url: signedUrls[p] }))
+    .filter((it) => !!it.url);
 
   if (!initialized) return null;
 
@@ -189,6 +291,13 @@ function WriteContent() {
           </p>
         </div>
 
+        <PhotoGallery
+          items={galleryItems}
+          onRemove={handleRemovePhoto}
+          legacyDataUrl={legacyPhotoUrl}
+          onRemoveLegacy={() => setLegacyPhotoUrl(undefined)}
+        />
+
         <div
           className="px-4 pt-4 pb-4 rounded-[20px] border border-white/10"
           style={{ background: "rgba(255,255,255,0.045)" }}
@@ -201,31 +310,27 @@ function WriteContent() {
           />
         </div>
 
-        {photoUrl && (
-          <div className="relative w-full h-40 rounded-[16px] overflow-hidden border border-white/10">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={photoUrl} alt="" className="w-full h-full object-cover" />
-            <button
-              onClick={() => setPhotoUrl(undefined)}
-              className="absolute top-2 right-2 bg-black/60 rounded-full py-1 px-3 text-white/60 hover:text-white text-xs"
-            >
-              Usuń
-            </button>
-          </div>
-        )}
-
         <button
           onClick={() => fileRef.current?.click()}
-          className="w-full py-3 rounded-[16px] text-sm font-medium"
+          disabled={uploading}
+          className="w-full py-3 rounded-[16px] text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60"
           style={{
-            background: "rgba(52,211,153,0.08)",
-            border: "1px solid rgba(52,211,153,0.18)",
-            color: "#34D399",
+            background: "rgba(124,92,191,0.10)",
+            border: "1px solid rgba(124,92,191,0.30)",
+            color: "#C4A8FF",
           }}
         >
-          Dodaj zdjęcie
+          <ImagePlus size={16} />
+          {uploading ? "Wgrywam..." : "Dodaj zdjęcie"}
         </button>
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={handlePhoto}
+        />
 
         <div className="h-4" />
         <button
@@ -247,7 +352,6 @@ function WriteContent() {
 
       <div className="px-5 pt-4 md:pt-10 pb-6">
 
-        {/* Header: greeting + date below */}
         <div className="mb-8 echo-enter">
           <h1 className="text-[28px] font-bold tracking-tight leading-tight text-white">
             Cześć {userName ?? "..."}
@@ -257,47 +361,74 @@ function WriteContent() {
           </p>
         </div>
 
-        {/* Zainspiruj mnie — button or revealed question */}
-        {question ? (
+        {/* „Zainspiruj mnie" po lewej, ikona „Dodaj zdjęcie" wypchnięta na prawą krawędź. */}
+        <div className="flex items-center justify-between mb-4 echo-enter" style={{ ["--enter-delay" as string]: "90ms" }}>
+          {question ? (
+            <button
+              onClick={() => {
+                setQuestion((prev) => getRandomQuestion(prev ?? undefined));
+                setTimeout(() => (document.querySelector(".ProseMirror") as HTMLElement)?.focus(), 80);
+              }}
+              className="flex-1 min-w-0 text-left text-[14px] leading-relaxed flex items-center justify-between gap-3 hover:bg-white/[0.06] active:scale-[0.98] transition-all"
+              style={{
+                background: "rgba(124,92,191,0.09)",
+                border: "1px solid rgba(124,92,191,0.2)",
+                borderRadius: "16px",
+                color: "#ffffff",
+                padding: "14px 12px 14px 12px",
+              }}
+            >
+              <span>{question}</span>
+              <span className="shrink-0 text-[18px] leading-none" style={{ color: "#ffffff" }}>›</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                setQuestion(getRandomQuestion());
+                setTimeout(() => (document.querySelector(".ProseMirror") as HTMLElement)?.focus(), 80);
+              }}
+              className="text-[14px] font-medium text-white text-left leading-relaxed flex items-center gap-2 hover:bg-white/[0.06] active:scale-[0.98] transition-all"
+              style={{
+                background: "rgba(124,92,191,0.10)",
+                border: "1px solid rgba(124,92,191,0.30)",
+                borderRadius: "16px",
+                padding: "14px 16px 14px 12px",
+              }}
+            >
+              <Sparkles size={15} style={{ color: "#A07DE0", flexShrink: 0 }} />
+              Zainspiruj mnie
+            </button>
+          )}
+
           <button
-            onClick={() => {
-              setQuestion((prev) => getRandomQuestion(prev ?? undefined));
-              setTimeout(() => (document.querySelector(".ProseMirror") as HTMLElement)?.focus(), 80);
-            }}
-            className="w-full mb-4 text-left text-[14px] leading-relaxed flex items-center justify-between gap-3 hover:bg-white/[0.06] active:scale-[0.98] transition-all echo-enter"
-            style={{
-              background: "rgba(124,92,191,0.09)",
-              border: "1px solid rgba(124,92,191,0.2)",
-              borderRadius: "16px",
-              color: "#ffffff",
-              padding: "14px 12px 14px 12px",
-              ["--enter-delay" as string]: "90ms",
-            }}
-          >
-            <span>{question}</span>
-            <span className="shrink-0 text-[18px] leading-none" style={{ color: "#ffffff" }}>›</span>
-          </button>
-        ) : (
-          <button
-            onClick={() => {
-              setQuestion(getRandomQuestion());
-              setTimeout(() => (document.querySelector(".ProseMirror") as HTMLElement)?.focus(), 80);
-            }}
-            className="mb-4 text-[14px] font-medium text-white text-left leading-relaxed flex items-center gap-2 hover:bg-white/[0.06] active:scale-[0.98] transition-all echo-enter"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            aria-label="Dodaj zdjęcie"
+            className="shrink-0 flex items-center justify-center hover:bg-white/[0.06] active:scale-[0.96] transition-all disabled:opacity-60"
             style={{
               background: "rgba(124,92,191,0.10)",
               border: "1px solid rgba(124,92,191,0.30)",
               borderRadius: "16px",
-              padding: "14px 16px 14px 12px",
-              ["--enter-delay" as string]: "90ms",
+              color: "#A07DE0",
+              width: 48,
+              height: 48,
             }}
           >
-            <Sparkles size={15} style={{ color: "#A07DE0", flexShrink: 0 }} />
-            Zainspiruj mnie
+            {uploading ? (
+              <span
+                className="inline-block w-4 h-4 rounded-full border-2 border-[#A07DE0] border-t-transparent animate-spin"
+                aria-hidden
+              />
+            ) : (
+              <ImagePlus size={18} />
+            )}
           </button>
-        )}
+        </div>
 
-        {/* Editor — collapsed or open */}
+        {/* Galeria zdjęć — nad wpisem */}
+        <PhotoGallery items={galleryItems} onRemove={handleRemovePhoto} />
+
+        {/* Editor */}
         {isEditorOpen ? (
           <div
             className="relative px-4 pt-5 pb-5 rounded-[20px] border border-white/10 bg-white/[0.055] mb-4 echo-enter"
@@ -334,32 +465,22 @@ function WriteContent() {
           </button>
         )}
 
-        {/* Photo preview */}
-        {photoUrl && (
-          <div className="relative w-full h-40 rounded-[16px] overflow-hidden border border-white/10 mb-4">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={photoUrl} alt="" className="w-full h-full object-cover" />
-            <button
-              onClick={() => setPhotoUrl(undefined)}
-              className="absolute top-2 right-2 bg-black/60 rounded-full py-1 px-3 text-white/60 hover:text-white text-xs"
-            >
-              Usuń
-            </button>
-          </div>
-        )}
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={handlePhoto}
+        />
 
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
-
-        {/* Save */}
         {(() => {
-          const hasContent = !!content.replace(/<[^>]*>/g, "").trim() || !!photoUrl;
+          const hasContent = !!content.replace(/<[^>]*>/g, "").trim() || photoPaths.length > 0;
           if (!hasContent) return null;
           return (
             <>
               <div className="h-6" />
-              {/* Dwie ścieżki: AI wyróżnione, zwykły zapis obok. Węższe, wyśrodkowane. */}
               <div className="flex flex-col md:flex-row items-center justify-center gap-2.5 md:gap-3">
-                {/* Główny — zapisz i analiza AI */}
                 <button
                   onClick={() => handleSave("ai")}
                   disabled={saving || saved}
@@ -371,7 +492,6 @@ function WriteContent() {
                 >
                   {saved ? "Zapisano" : "Analizuj z AI"}
                 </button>
-                {/* Drugorzędny — zwykły zapis */}
                 <button
                   onClick={() => handleSave("entries")}
                   disabled={saving || saved}

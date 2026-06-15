@@ -5,15 +5,26 @@ import Link from "next/link";
 import { PenLine } from "lucide-react";
 import EntryCard from "@/components/EntryCard";
 import { getEntries } from "@/lib/storage";
+import { getSignedUrls } from "@/lib/photos";
 import type { Entry } from "@/lib/types";
 
 export default function EntriesPage() {
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [thumbs, setThumbs] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let cancelled = false;
-    getEntries().then((rows) => {
-      if (!cancelled) setEntries(rows);
+    getEntries().then(async (rows) => {
+      if (cancelled) return;
+      setEntries(rows);
+      // Pierwsze zdjęcie każdego wpisu z bucketu — w jednej partii.
+      const firstPaths = rows
+        .map((e) => e.photoPaths?.[0])
+        .filter((p): p is string => !!p);
+      if (firstPaths.length) {
+        const urls = await getSignedUrls(firstPaths);
+        if (!cancelled) setThumbs(urls);
+      }
     });
     return () => {
       cancelled = true;
@@ -58,7 +69,10 @@ export default function EntriesPage() {
               className="echo-enter"
               style={{ ["--enter-delay" as string]: `${60 + i * 55}ms` }}
             >
-              <EntryCard entry={entry} />
+              <EntryCard
+                entry={entry}
+                thumbUrl={entry.photoPaths?.[0] ? thumbs[entry.photoPaths[0]] : undefined}
+              />
             </div>
           ))}
         </div>

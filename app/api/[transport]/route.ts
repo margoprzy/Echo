@@ -49,6 +49,13 @@ const baseHandler = createMcpHandler(
             .string()
             .optional()
             .describe("Data wpisu w formacie ISO 8601 (np. 2026-06-10). Domyślnie dziś."),
+          photos: z
+            .array(z.string())
+            .max(10)
+            .optional()
+            .describe(
+              "Opcjonalna lista zdjęć jako data URL-e z base64 (np. 'data:image/jpeg;base64,...'). Maks. 10."
+            ),
         },
       },
       async (args, extra) => {

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Trash2, Sparkles } from "lucide-react";
 import { getEntries, deleteEntry } from "@/lib/storage";
+import { getSignedUrlsOrdered, deletePhotos } from "@/lib/photos";
 import type { Entry } from "@/lib/types";
 
 function formatDate(iso: string): string {
@@ -26,13 +27,19 @@ export default function EntryDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [entry, setEntry] = useState<Entry | null>(null);
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    getEntries().then((rows) => {
+    getEntries().then(async (rows) => {
       if (cancelled) return;
-      setEntry(rows.find((e) => e.id === id) ?? null);
+      const found = rows.find((e) => e.id === id) ?? null;
+      setEntry(found);
+      if (found?.photoPaths?.length) {
+        const urls = await getSignedUrlsOrdered(found.photoPaths);
+        if (!cancelled) setPhotoUrls(urls);
+      }
     });
     return () => {
       cancelled = true;
@@ -43,6 +50,10 @@ export default function EntryDetailPage() {
     if (!confirmDelete) {
       setConfirmDelete(true);
       return;
+    }
+    // Najpierw sprzątamy bucket — RLS pozwoli zalogowanemu właścicielowi.
+    if (entry?.photoPaths?.length) {
+      await deletePhotos(entry.photoPaths);
     }
     await deleteEntry(id);
     router.push("/entries");
@@ -133,11 +144,26 @@ export default function EntryDetailPage() {
           <p className="text-white/30 text-xs mt-0.5">{formatTime(entry.date)}</p>
         </div>
 
-        {/* Photo */}
-        {entry.photoUrl && (
+        {/* Galeria zdjęć — pozioma. Stare wpisy mają photoUrl (base64). */}
+        {entry.photoUrl && photoUrls.length === 0 && (
           <div className="w-full h-52 rounded-[20px] overflow-hidden border border-white/10">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={entry.photoUrl} alt="" className="w-full h-full object-cover" />
+          </div>
+        )}
+        {photoUrls.length > 0 && (
+          <div className="-mx-5 px-5 overflow-x-auto echo-no-scrollbar">
+            <div className="flex gap-3 snap-x snap-mandatory pb-1">
+              {photoUrls.map((url, i) => (
+                <div
+                  key={url + i}
+                  className="shrink-0 snap-start w-[82%] max-w-[420px] aspect-[4/3] rounded-[20px] overflow-hidden border border-white/10"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt="" className="w-full h-full object-cover" />
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

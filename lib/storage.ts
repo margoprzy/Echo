@@ -7,6 +7,7 @@ interface EntryRow {
   date: string;
   content: string;
   photo_url: string | null;
+  photo_paths: string[] | null;
 }
 
 function rowToEntry(row: EntryRow): Entry {
@@ -15,6 +16,7 @@ function rowToEntry(row: EntryRow): Entry {
     date: row.date,
     content: row.content,
     photoUrl: row.photo_url ?? undefined,
+    photoPaths: row.photo_paths && row.photo_paths.length ? row.photo_paths : undefined,
   };
 }
 
@@ -26,7 +28,7 @@ async function currentUserId(): Promise<string | null> {
 export async function getEntries(): Promise<Entry[]> {
   const { data, error } = await supabase
     .from("entries")
-    .select("id, user_id, date, content, photo_url")
+    .select("id, user_id, date, content, photo_url, photo_paths")
     .order("date", { ascending: false });
   if (error) {
     console.error("getEntries failed", error);
@@ -47,6 +49,7 @@ export async function saveEntry(entry: Entry): Promise<void> {
     date: entry.date,
     content: entry.content,
     photo_url: entry.photoUrl ?? null,
+    photo_paths: entry.photoPaths ?? [],
   };
   const { error } = await supabase.from("entries").upsert(row);
   if (error) console.error("saveEntry failed", error);

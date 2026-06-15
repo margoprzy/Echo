@@ -4,6 +4,7 @@ import { FREUD, buildContextBlock, htmlToPlainText } from "@/lib/freud";
 import { embedText, toVectorLiteral } from "@/lib/embeddings";
 import type { Entry } from "@/lib/types";
 import { db, plainTextToHtml } from "@/lib/api/server";
+import { uploadApiPhotos, resolveUserId } from "@/lib/api/server-storage";
 import { cleanEnv } from "@/lib/env";
 
 /**
@@ -23,6 +24,7 @@ interface EntryRow {
   content: string;
   title: string | null;
   photo_url: string | null;
+  photo_paths: string[] | null;
   created_at: string;
 }
 
@@ -37,6 +39,7 @@ function toDto(row: EntryRow) {
     title: row.title ?? null,
     content: row.content,
     text: htmlToPlainText(row.content),
+    photoPaths: row.photo_paths ?? [],
     createdAt: row.created_at,
   };
 }
@@ -65,7 +68,12 @@ function handleDbError(error: { message?: string; code?: string }): never {
 
 export async function addEntry(
   tokenHash: string,
-  input: { content: string; title?: string | null; date?: string | null }
+  input: {
+    content: string;
+    title?: string | null;
+    date?: string | null;
+    photos?: string[] | null;
+  }
 ) {
   if (!input.content || !input.content.trim()) {
     throw new ApiOpError("bad_request", "Pole 'content' jest wymagane (niepusty tekst).");
@@ -83,11 +91,30 @@ export async function addEntry(
     dateIso = new Date().toISOString();
   }
 
+  // Jeśli przesłano zdjęcia (data URL z base64), wgrywamy je przed insertem wpisu.
+  let photoPaths: string[] = [];
+  if (input.photos && input.photos.length) {
+    const userId = await resolveUserId(db(), tokenHash);
+    if (!userId) {
+      throw new ApiOpError("invalid_token", "Nieprawidłowy lub odwołany token API.");
+    }
+    try {
+      photoPaths = await uploadApiPhotos(userId, input.photos);
+    } catch (err) {
+      console.error("addEntry: photo upload failed", err);
+      throw new ApiOpError(
+        "server_error",
+        "Nie udało się wgrać zdjęć (brak konfiguracji storage po stronie serwera)."
+      );
+    }
+  }
+
   const { data, error } = await db().rpc("api_add_entry", {
     p_token_hash: tokenHash,
     p_content: plainTextToHtml(input.content),
     p_title: input.title ?? null,
     p_date: dateIso,
+    p_photo_paths: photoPaths,
   });
   if (error) handleDbError(error);
   return toDto(data as EntryRow);

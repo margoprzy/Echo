@@ -1,4 +1,5 @@
 import { db, json, apiError, requireToken, mapDbError, plainTextToHtml, preflight } from "@/lib/api/server";
+import { uploadApiPhotos, resolveUserId } from "@/lib/api/server-storage";
 import { htmlToPlainText } from "@/lib/freud";
 
 /**
@@ -16,6 +17,7 @@ interface EntryRow {
   content: string;
   title: string | null;
   photo_url: string | null;
+  photo_paths: string[] | null;
   created_at: string;
 }
 
@@ -27,6 +29,7 @@ function toDto(row: EntryRow) {
     title: row.title ?? null,
     content: row.content, // HTML tak jak przechowywany w Echo
     text: htmlToPlainText(row.content), // wygodny czysty tekst
+    photoPaths: row.photo_paths ?? [],
     createdAt: row.created_at,
   };
 }
@@ -50,7 +53,7 @@ export async function POST(req: Request) {
   const auth = requireToken(req);
   if ("response" in auth) return auth.response;
 
-  let body: { content?: unknown; title?: unknown; date?: unknown };
+  let body: { content?: unknown; title?: unknown; date?: unknown; photos?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -65,6 +68,18 @@ export async function POST(req: Request) {
   }
   if (body.date != null && typeof body.date !== "string") {
     return apiError("bad_request", "Pole 'date' musi być tekstem (ISO 8601).", 400);
+  }
+  if (body.photos != null) {
+    if (!Array.isArray(body.photos) || body.photos.some((p) => typeof p !== "string")) {
+      return apiError(
+        "bad_request",
+        "Pole 'photos' musi być listą napisów (data URL z base64).",
+        400
+      );
+    }
+    if (body.photos.length > 10) {
+      return apiError("bad_request", "Maksymalnie 10 zdjęć na wpis.", 400);
+    }
   }
 
   // Domyślnie: teraz (dzień dzisiejszy). Jeśli podano datę bez czasu, ustaw południe UTC,
@@ -82,11 +97,32 @@ export async function POST(req: Request) {
     dateIso = new Date().toISOString();
   }
 
+  // Upload zdjęć (opcjonalne) — przed insertem.
+  let photoPaths: string[] = [];
+  const photos = body.photos as string[] | undefined;
+  if (photos && photos.length) {
+    const userId = await resolveUserId(db(), auth.tokenHash);
+    if (!userId) {
+      return apiError("invalid_token", "Nieprawidłowy lub odwołany token API.", 401);
+    }
+    try {
+      photoPaths = await uploadApiPhotos(userId, photos);
+    } catch (err) {
+      console.error("entries POST: photo upload failed", err);
+      return apiError(
+        "server_error",
+        "Nie udało się wgrać zdjęć (brak konfiguracji storage po stronie serwera).",
+        500
+      );
+    }
+  }
+
   const { data, error } = await db().rpc("api_add_entry", {
     p_token_hash: auth.tokenHash,
     p_content: plainTextToHtml(body.content),
     p_title: body.title ?? null,
     p_date: dateIso,
+    p_photo_paths: photoPaths,
   });
 
   if (error) return mapDbError(error);
