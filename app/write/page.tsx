@@ -227,7 +227,7 @@ function WriteContent() {
     }
   }
 
-  async function handleSave(destination: "entries" | "ai" = "entries") {
+  async function handleSave(destination: "calendar" | "ai" = "calendar") {
     const text = content.replace(/<[^>]*>/g, "").trim();
     const hasPhoto = photoPaths.length > 0 || !!legacyPhotoUrl;
     if (!text && !hasPhoto) return;
@@ -261,10 +261,8 @@ function WriteContent() {
       setSaved(false);
       if (destination === "ai") {
         router.push(`/ai?entry=${entry.id}`);
-      } else if (existingEntry) {
-        router.push(`/entries/${existingEntry.id}`);
       } else {
-        router.push("/entries");
+        router.push("/calendar");
       }
     }, 900);
   }
@@ -493,7 +491,7 @@ function WriteContent() {
                   {saved ? "Zapisano" : "Analizuj z AI"}
                 </button>
                 <button
-                  onClick={() => handleSave("entries")}
+                  onClick={() => handleSave("calendar")}
                   disabled={saving || saved}
                   className="px-6 py-2.5 rounded-[14px] font-medium text-sm text-[#C4A8FF] bg-white/[0.04] border border-[#A07DE0]/40 transition-all duration-150 active:scale-[0.96] active:bg-white/[0.12] md:hover:bg-white/[0.09] md:hover:border-[#A07DE0]/70 disabled:opacity-60"
                 >

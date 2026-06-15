@@ -19,7 +19,6 @@ const TITLES: Record<string, string> = {
   "/ai": "Analiza AI",
   "/docs": "API / Dokumentacja",
   "/profile": "Profil",
-  "/entries": "Wpisy",
 };
 
 export default function MobileNav() {

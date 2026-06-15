@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Sparkles, PenLine } from "lucide-react";
+import { PenLine } from "lucide-react";
 import ActivityCalendar from "@/components/ActivityCalendar";
 import { getEntries } from "@/lib/storage";
 import type { Entry } from "@/lib/types";
@@ -114,17 +114,18 @@ export default function CalendarPage() {
             })}
 
             {latestOfDay && (
-              <Link
-                href={`/ai?entry=${latestOfDay.id}`}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-[14px] font-semibold text-sm text-white active:scale-[0.98] transition-all mt-1"
-                style={{
-                  background: "linear-gradient(135deg, #7C5CBF 0%, #A07DE0 100%)",
-                  boxShadow: "0 8px 22px rgba(124,92,191,0.30)",
-                }}
-              >
-                <Sparkles size={16} />
-                Analizuj ten dzień z AI
-              </Link>
+              <div className="flex justify-center mt-1">
+                <Link
+                  href={`/ai?entry=${latestOfDay.id}`}
+                  className="w-1/2 flex items-center justify-center py-3 rounded-[14px] font-semibold text-sm text-white active:scale-[0.98] transition-all"
+                  style={{
+                    background: "linear-gradient(135deg, #7C5CBF 0%, #A07DE0 100%)",
+                    boxShadow: "0 8px 22px rgba(124,92,191,0.30)",
+                  }}
+                >
+                  Analizuj z AI
+                </Link>
+              </div>
             )}
           </div>
         )}

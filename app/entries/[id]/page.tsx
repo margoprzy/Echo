@@ -56,7 +56,7 @@ export default function EntryDetailPage() {
       await deletePhotos(entry.photoPaths);
     }
     await deleteEntry(id);
-    router.push("/entries");
+    router.push("/calendar");
   }
 
   if (!entry) {
