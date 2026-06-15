@@ -9,7 +9,7 @@ import { saveEntry, getEntries } from "@/lib/storage";
 import { getRandomQuestion } from "@/lib/questions";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
-import { uploadPhotos, getSignedUrls, deletePhotos } from "@/lib/photos";
+import { uploadPhoto, getSignedUrls, deletePhotos } from "@/lib/photos";
 import type { Entry } from "@/lib/types";
 
 function todayLabel(): string {
@@ -79,19 +79,29 @@ function NameSetupModal({ onDone }: { onDone: (name: string) => void }) {
   );
 }
 
+interface PendingPhoto {
+  id: string;
+  blobUrl: string;
+}
+
 /** Pozioma galeria z miniaturkami (snap scroll) + przycisk usuwania. */
 function PhotoGallery({
   items,
+  pending,
   onRemove,
+  onCancelPending,
   legacyDataUrl,
   onRemoveLegacy,
 }: {
   items: { path: string; url: string }[];
+  pending?: PendingPhoto[];
   onRemove: (path: string) => void;
+  onCancelPending?: (id: string) => void;
   legacyDataUrl?: string;
   onRemoveLegacy?: () => void;
 }) {
-  if (!items.length && !legacyDataUrl) return null;
+  const hasAny = items.length || pending?.length || legacyDataUrl;
+  if (!hasAny) return null;
   return (
     <div className="-mx-5 px-5 mb-4 overflow-x-auto echo-no-scrollbar">
       <div className="flex gap-3 snap-x snap-mandatory pb-1">
@@ -126,6 +136,31 @@ function PhotoGallery({
             </button>
           </div>
         ))}
+        {pending?.map((p) => (
+          <div
+            key={p.id}
+            className="relative shrink-0 snap-start w-[78%] max-w-[320px] aspect-[4/3] rounded-[16px] overflow-hidden border border-white/10"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={p.blobUrl} alt="" className="w-full h-full object-cover" />
+            {/* overlay z wskaźnikiem ładowania */}
+            <div className="absolute inset-0 flex items-center justify-center bg-black/35">
+              <span
+                className="inline-block w-6 h-6 rounded-full border-2 border-white border-t-transparent animate-spin"
+                aria-hidden
+              />
+            </div>
+            {onCancelPending && (
+              <button
+                onClick={() => onCancelPending(p.id)}
+                aria-label="Anuluj wgrywanie"
+                className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center bg-black/65 hover:bg-black/85 rounded-full text-white/80"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -142,9 +177,10 @@ function WriteContent() {
   const [content, setContent] = useState("");
   const [photoPaths, setPhotoPaths] = useState<string[]>([]);
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  const [pendingPhotos, setPendingPhotos] = useState<PendingPhoto[]>([]);
+  const cancelledPendingRef = useRef<Set<string>>(new Set());
   // Stary format (jeden inline base64) — zachowywany przy edycji, nie tworzymy nowych.
   const [legacyPhotoUrl, setLegacyPhotoUrl] = useState<string | undefined>();
-  const [uploading, setUploading] = useState(false);
   const [resetKey, setResetKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -202,15 +238,44 @@ function WriteContent() {
     const files = Array.from(e.target.files ?? []);
     e.target.value = ""; // pozwala wybrać te same pliki ponownie
     if (!files.length) return;
-    setUploading(true);
-    const newPaths = await uploadPhotos(files);
-    if (newPaths.length) {
-      uploadedThisSession.current.push(...newPaths);
-      setPhotoPaths((prev) => [...prev, ...newPaths]);
-      const urls = await getSignedUrls(newPaths);
-      setSignedUrls((prev) => ({ ...prev, ...urls }));
-    }
-    setUploading(false);
+
+    // Krok 1: lokalne podglądy z pamięci — natychmiast widoczne, bez czekania na upload.
+    const previews: { file: File; pending: PendingPhoto }[] = files.map((file) => ({
+      file,
+      pending: { id: crypto.randomUUID(), blobUrl: URL.createObjectURL(file) },
+    }));
+    setPendingPhotos((prev) => [...prev, ...previews.map((p) => p.pending)]);
+
+    // Krok 2: w tle kompresujemy i wgrywamy każdy plik niezależnie.
+    await Promise.all(
+      previews.map(async ({ file, pending }) => {
+        const path = await uploadPhoto(file);
+        const wasCancelled = cancelledPendingRef.current.delete(pending.id);
+        // sprzątamy lokalny URL z pamięci
+        URL.revokeObjectURL(pending.blobUrl);
+        setPendingPhotos((prev) => prev.filter((p) => p.id !== pending.id));
+        if (!path) return;
+        if (wasCancelled) {
+          // Użytkownik kliknął anuluj zanim upload się skończył — usuń od razu z bucketu.
+          void deletePhotos([path]);
+          return;
+        }
+        uploadedThisSession.current.push(path);
+        setPhotoPaths((prev) => [...prev, path]);
+        const urls = await getSignedUrls([path]);
+        setSignedUrls((prev) => ({ ...prev, ...urls }));
+      })
+    );
+  }
+
+  function handleCancelPending(id: string) {
+    // oznaczamy do skasowania po dotarciu uploadu; w UI natychmiast usuwamy podgląd
+    cancelledPendingRef.current.add(id);
+    setPendingPhotos((prev) => {
+      const item = prev.find((p) => p.id === id);
+      if (item) URL.revokeObjectURL(item.blobUrl);
+      return prev.filter((p) => p.id !== id);
+    });
   }
 
   function handleRemovePhoto(path: string) {
@@ -231,6 +296,14 @@ function WriteContent() {
     const text = content.replace(/<[^>]*>/g, "").trim();
     const hasPhoto = photoPaths.length > 0 || !!legacyPhotoUrl;
     if (!text && !hasPhoto) return;
+    // Jeśli jeszcze wgrywamy — anuluj wszystkie w trakcie (nie czekaj na nie).
+    if (pendingPhotos.length) {
+      for (const p of pendingPhotos) cancelledPendingRef.current.add(p.id);
+      setPendingPhotos((prev) => {
+        for (const p of prev) URL.revokeObjectURL(p.blobUrl);
+        return [];
+      });
+    }
     setSaving(true);
     const entry: Entry = existingEntry
       ? {
@@ -291,7 +364,9 @@ function WriteContent() {
 
         <PhotoGallery
           items={galleryItems}
+          pending={pendingPhotos}
           onRemove={handleRemovePhoto}
+          onCancelPending={handleCancelPending}
           legacyDataUrl={legacyPhotoUrl}
           onRemoveLegacy={() => setLegacyPhotoUrl(undefined)}
         />
@@ -310,8 +385,7 @@ function WriteContent() {
 
         <button
           onClick={() => fileRef.current?.click()}
-          disabled={uploading}
-          className="w-full py-3 rounded-[16px] text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60"
+          className="w-full py-3 rounded-[16px] text-sm font-medium flex items-center justify-center gap-2"
           style={{
             background: "rgba(124,92,191,0.10)",
             border: "1px solid rgba(124,92,191,0.30)",
@@ -319,7 +393,7 @@ function WriteContent() {
           }}
         >
           <ImagePlus size={16} />
-          {uploading ? "Wgrywam..." : "Dodaj zdjęcie"}
+          Dodaj zdjęcie
         </button>
         <input
           ref={fileRef}
@@ -400,9 +474,8 @@ function WriteContent() {
 
           <button
             onClick={() => fileRef.current?.click()}
-            disabled={uploading}
             aria-label="Dodaj zdjęcie"
-            className="shrink-0 flex items-center justify-center hover:bg-white/[0.06] active:scale-[0.96] transition-all disabled:opacity-60"
+            className="shrink-0 flex items-center justify-center hover:bg-white/[0.06] active:scale-[0.96] transition-all"
             style={{
               background: "rgba(124,92,191,0.10)",
               border: "1px solid rgba(124,92,191,0.30)",
@@ -412,19 +485,17 @@ function WriteContent() {
               height: 48,
             }}
           >
-            {uploading ? (
-              <span
-                className="inline-block w-4 h-4 rounded-full border-2 border-[#A07DE0] border-t-transparent animate-spin"
-                aria-hidden
-              />
-            ) : (
-              <ImagePlus size={18} />
-            )}
+            <ImagePlus size={18} />
           </button>
         </div>
 
         {/* Galeria zdjęć — nad wpisem */}
-        <PhotoGallery items={galleryItems} onRemove={handleRemovePhoto} />
+        <PhotoGallery
+          items={galleryItems}
+          pending={pendingPhotos}
+          onRemove={handleRemovePhoto}
+          onCancelPending={handleCancelPending}
+        />
 
         {/* Editor */}
         {isEditorOpen ? (
