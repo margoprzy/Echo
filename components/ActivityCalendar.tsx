@@ -16,6 +16,15 @@ function getDaysWithEntries(entries: Entry[]): Set<string> {
   return new Set(entries.map((e) => e.date.slice(0, 10)));
 }
 
+function getDaysWithPhoto(entries: Entry[]): Set<string> {
+  const out = new Set<string>();
+  for (const e of entries) {
+    const hasPhoto = (e.photoPaths && e.photoPaths.length > 0) || !!e.photoUrl;
+    if (hasPhoto) out.add(e.date.slice(0, 10));
+  }
+  return out;
+}
+
 function calcStreak(entries: Entry[]): number {
   const days = [...getDaysWithEntries(entries)].sort().reverse();
   if (!days.length) return 0;
@@ -40,6 +49,7 @@ export default function ActivityCalendar({ entries, selectedDay, onSelectDay }: 
   const [month, setMonth] = useState(now.getMonth()); // 0-indexed
 
   const activeDays = getDaysWithEntries(entries);
+  const photoDays = getDaysWithPhoto(entries);
   const streak = calcStreak(entries);
   const today = now.toISOString().slice(0, 10);
 
@@ -117,6 +127,7 @@ export default function ActivityCalendar({ entries, selectedDay, onSelectDay }: 
             }
             const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
             const hasEntry = activeDays.has(dateStr);
+            const hasPhoto = photoDays.has(dateStr);
             const isToday = dateStr === today;
             const isSelected = dateStr === selectedDay;
 
@@ -124,7 +135,7 @@ export default function ActivityCalendar({ entries, selectedDay, onSelectDay }: 
               <div key={i} className="flex items-center justify-center py-0.5">
                 <div
                   onClick={() => hasEntry && onSelectDay?.(dateStr)}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-xs transition-colors
+                  className={`relative w-8 h-8 rounded-full flex items-center justify-center text-xs transition-colors
                     ${hasEntry
                       ? "bg-[#7C5CBF] text-white font-semibold cursor-pointer hover:bg-[#9370DB] active:scale-95"
                       : isToday
@@ -134,6 +145,12 @@ export default function ActivityCalendar({ entries, selectedDay, onSelectDay }: 
                     ${isSelected ? "ring-2 ring-[#C4A8FF] ring-offset-2 ring-offset-[#15122b]" : ""}`}
                 >
                   {dayNum}
+                  {hasPhoto && (
+                    <span
+                      aria-label="Zdjęcie"
+                      className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white"
+                    />
+                  )}
                 </div>
               </div>
             );
