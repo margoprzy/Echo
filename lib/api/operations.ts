@@ -1,6 +1,7 @@
 import { createXai } from "@ai-sdk/xai";
 import { generateText } from "ai";
 import { FREUD, buildContextBlock, htmlToPlainText } from "@/lib/freud";
+import { embedText, toVectorLiteral } from "@/lib/embeddings";
 import type { Entry } from "@/lib/types";
 import { db, plainTextToHtml } from "@/lib/api/server";
 import { cleanEnv } from "@/lib/env";
@@ -23,6 +24,10 @@ interface EntryRow {
   title: string | null;
   photo_url: string | null;
   created_at: string;
+}
+
+interface SearchResultRow extends EntryRow {
+  score?: number;
 }
 
 function toDto(row: EntryRow) {
@@ -126,9 +131,29 @@ export async function askTherapist(
   const dayEntries = (ctx.day ?? []).map(rowToEntry);
   const recentEntries = (ctx.recent ?? []).map(rowToEntry);
 
+  // Wyszukiwanie hybrydowe: embedding zapytania + search_entries.
+  let relevantEntries: Entry[] = [];
+  let relevantCount = 0;
+  try {
+    const queryEmbedding = await embedText(input.message);
+    const queryEmbeddingLit = toVectorLiteral(queryEmbedding);
+    const { data: searchResults, error: searchError } = await db().rpc("api_search_entries", {
+      p_token_hash: tokenHash,
+      p_query_text: input.message,
+      p_query_embedding: queryEmbeddingLit,
+      p_limit: 8,
+    });
+    if (!searchError && searchResults) {
+      relevantEntries = (searchResults as SearchResultRow[]).map(rowToEntry);
+      relevantCount = relevantEntries.length;
+    }
+  } catch {
+    // Embeddingi opcjonalne — jeśli się nie uda, kontynuujemy bez nich.
+  }
+
   const xai = createXai({ apiKey });
-  // Wszystkie wpisy danego dnia jako oś rozmowy; reszta (30 dni) jako tło.
-  const system = `${FREUD.systemPrompt}\n\n${buildContextBlock(dayEntries, recentEntries)}`;
+  // Wszystkie wpisy danego dnia jako oś rozmowy; powiązane wpisy z wyszukiwania; reszta (30 dni) jako tło.
+  const system = `${FREUD.systemPrompt}\n\n${buildContextBlock(dayEntries, recentEntries, relevantEntries)}`;
 
   try {
     const { text } = await generateText({
@@ -136,7 +161,7 @@ export async function askTherapist(
       system,
       prompt: input.message,
     });
-    return { reply: text, contextDate: date, contextEntries: dayEntries.length };
+    return { reply: text, contextDate: date, contextEntries: dayEntries.length, relevantCount };
   } catch {
     throw new ApiOpError("ai_error", "Nie udało się uzyskać odpowiedzi od modelu AI.");
   }

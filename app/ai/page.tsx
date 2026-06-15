@@ -11,6 +11,7 @@ import {
   getMessages,
   appendMessage,
 } from "@/lib/storage";
+import { supabase } from "@/lib/supabase";
 import { useSpeechRecognition } from "@/lib/useSpeechRecognition";
 import type { Entry } from "@/lib/types";
 
@@ -71,6 +72,7 @@ function AiContent() {
   const [dayCount, setDayCount] = useState(0);
   const [ready, setReady] = useState(false);
   const [input, setInput] = useState("");
+  const sessionTokenRef = useRef<string | null>(null);
 
   // Kontekst dla każdego żądania (wszystkie wpisy dnia + ostatnie 30 dni) — wstrzykiwany przez transport.
   const ctxRef = useRef<{ dayEntries: Entry[]; recentEntries: Entry[] }>({
@@ -91,6 +93,7 @@ function AiContent() {
             messages,
             dayEntries: ctxRef.current.dayEntries,
             recentEntries: ctxRef.current.recentEntries,
+            sessionToken: sessionTokenRef.current,
           },
         }),
       }),
@@ -114,6 +117,10 @@ function AiContent() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Pobierz access token sesji Supabase — potrzebny do wyszukiwania hybrydowego.
+      const { data: { session } } = await supabase.auth.getSession();
+      sessionTokenRef.current = session?.access_token ?? null;
+
       const rows = await getEntries();
       if (cancelled) return;
       const c = computeContext(rows, entryId);

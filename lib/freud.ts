@@ -91,14 +91,16 @@ function formatEntryTime(iso: string): string {
 
 /**
  * Buduje blok kontekstu (czysty tekst) wstrzykiwany do promptu systemowego:
- * WSZYSTKIE wpisy z analizowanego dnia (oś rozmowy) + tło z ostatnich N dni.
+ * WSZYSTKIE wpisy z analizowanego dnia (oś rozmowy) + tło z ostatnich N dni + opcjonalnie powiązane wpisy.
  *
  * `dayEntries` to komplet wpisów z jednego dnia (może być ich kilka — krótkie myśli
  * z całego dnia). Renderujemy je chronologicznie i traktujemy łącznie.
+ * `relevantEntries` to wyniki wyszukiwania hybrydowego (dopasowane do pytania użytkownika).
  */
 export function buildContextBlock(
   dayEntries: Entry[],
-  recentEntries: Entry[]
+  recentEntries: Entry[],
+  relevantEntries?: Entry[]
 ): string {
   const parts: string[] = [];
 
@@ -122,9 +124,29 @@ export function buildContextBlock(
     parts.push(`${header}\n\n${rendered}`);
   }
 
-  // Tło: pozostałe zapiski (z wykluczeniem wpisów dnia, gdyby się powtórzyły).
+  // Powiązane wpisy (wyszukiwanie hybrydowe — najlepiej dopasowane do pytania/tematu).
+  if (relevantEntries && relevantEntries.length > 0) {
+    const dayIds = new Set(dayEntries.map((e) => e.id));
+    const unique = relevantEntries.filter((e) => !dayIds.has(e.id));
+    if (unique.length > 0) {
+      const rendered = unique
+        .map((e) => {
+          const text = htmlToPlainText(e.content);
+          return `— ${formatEntryDate(e.date)} —\n${text || "(pusty wpis)"}`;
+        })
+        .join("\n\n");
+      parts.push(
+        `=== POWIĄZANE WCZEŚNIEJSZE WPISY (dopasowane do pytania) ===\n${rendered}`
+      );
+    }
+  }
+
+  // Tło: pozostałe zapiski (z wykluczeniem wpisów dnia i powiązanych, gdyby się powtórzyły).
   const dayIds = new Set(dayEntries.map((e) => e.id));
-  const background = recentEntries.filter((e) => !dayIds.has(e.id)).slice(0, 60);
+  const relevantIds = new Set((relevantEntries ?? []).map((e) => e.id));
+  const background = recentEntries
+    .filter((e) => !dayIds.has(e.id) && !relevantIds.has(e.id))
+    .slice(0, 60);
 
   if (background.length > 0) {
     const rendered = background

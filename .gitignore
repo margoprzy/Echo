@@ -41,3 +41,9 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# seed scripts cache (large)
+scripts/.seed-*.json
+scripts/.seed-*.sql
+scripts/batch_*.sql
+scripts/mini_batch_*.sql

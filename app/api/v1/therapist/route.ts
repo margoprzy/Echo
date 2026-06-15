@@ -1,8 +1,10 @@
 import { createXai } from "@ai-sdk/xai";
 import { generateText } from "ai";
 import { FREUD, buildContextBlock } from "@/lib/freud";
+import { embedText } from "@/lib/embeddings";
+import { toVectorLiteral } from "@/lib/embeddings";
 import type { Entry } from "@/lib/types";
-import { db, json, apiError, requireToken, mapDbError, preflight } from "@/lib/api/server";
+import { db, json, apiError, requireToken, mapDbError, preflight, plainTextToHtml } from "@/lib/api/server";
 
 /**
  * /api/v1/therapist
@@ -22,7 +24,11 @@ interface EntryRow {
   photo_url: string | null;
 }
 
-function rowToEntry(row: EntryRow): Entry {
+interface SearchResultRow extends EntryRow {
+  score?: number;
+}
+
+function rowToEntry(row: EntryRow | SearchResultRow): Entry {
   return { id: row.id, date: row.date, content: row.content, photoUrl: row.photo_url ?? undefined };
 }
 
@@ -75,9 +81,30 @@ export async function POST(req: Request) {
   const dayEntries = (ctx.day ?? []).map(rowToEntry);
   const recentEntries = (ctx.recent ?? []).map(rowToEntry);
 
+  // Wyszukiwanie hybrydowe: embedding zapytania + search_entries.
+  let relevantEntries: Entry[] = [];
+  let relevantCount = 0;
+  try {
+    const queryEmbedding = await embedText(body.message);
+    const queryEmbeddingLit = toVectorLiteral(queryEmbedding);
+    const { data: searchResults, error: searchError } = await db().rpc("api_search_entries", {
+      p_token_hash: auth.tokenHash,
+      p_query_text: body.message,
+      p_query_embedding: queryEmbeddingLit,
+      p_limit: 8,
+    });
+    if (!searchError && searchResults) {
+      relevantEntries = (searchResults as SearchResultRow[]).map(rowToEntry);
+      relevantCount = relevantEntries.length;
+    }
+  } catch (embedError) {
+    // Embeddingi opcjonalne — jeśli się nie uda, kontynuujemy bez nich.
+    console.warn("Embedding/search error:", embedError);
+  }
+
   const xai = createXai({ apiKey });
-  // Wszystkie wpisy danego dnia jako oś rozmowy; reszta (30 dni) jako tło.
-  const system = `${FREUD.systemPrompt}\n\n${buildContextBlock(dayEntries, recentEntries)}`;
+  // Wszystkie wpisy danego dnia jako oś rozmowy; powiązane wpisy z wyszukiwania; reszta (30 dni) jako tło.
+  const system = `${FREUD.systemPrompt}\n\n${buildContextBlock(dayEntries, recentEntries, relevantEntries)}`;
 
   try {
     const { text } = await generateText({
@@ -89,6 +116,7 @@ export async function POST(req: Request) {
       reply: text,
       contextDate: date,
       contextEntries: dayEntries.length,
+      relevantCount,
     });
   } catch {
     return apiError("ai_error", "Nie udało się uzyskać odpowiedzi od modelu AI.", 502);
