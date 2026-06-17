@@ -8,6 +8,7 @@ import { cleanEnv } from "@/lib/env";
  */
 
 const BUCKET = "entry-photos";
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024; // 10 MB per file
 let cached: SupabaseClient | null = null;
 
 function admin(): SupabaseClient {
@@ -55,6 +56,7 @@ export async function uploadApiPhotos(userId: string, photos: string[]): Promise
   for (const raw of photos) {
     const decoded = decodeDataUrl(raw);
     if (!decoded) continue;
+    if (decoded.bytes.byteLength > MAX_PHOTO_BYTES) continue;
     const path = `${userId}/${randomSegment()}.${extFromContentType(decoded.contentType)}`;
     const { error } = await client.storage.from(BUCKET).upload(path, decoded.bytes, {
       contentType: decoded.contentType,

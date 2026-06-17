@@ -4,7 +4,7 @@ import { FREUD, buildContextBlock } from "@/lib/freud";
 import { embedText } from "@/lib/embeddings";
 import { toVectorLiteral } from "@/lib/embeddings";
 import type { Entry } from "@/lib/types";
-import { db, json, apiError, requireToken, mapDbError, preflight, plainTextToHtml } from "@/lib/api/server";
+import { db, json, apiError, requireToken, mapDbError, preflight, plainTextToHtml, setRequestContext } from "@/lib/api/server";
 
 /**
  * /api/v1/therapist
@@ -40,11 +40,12 @@ function parseDate(input: string | null | undefined): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export async function OPTIONS() {
-  return preflight();
+export async function OPTIONS(req: Request) {
+  return preflight(req);
 }
 
 export async function POST(req: Request) {
+  setRequestContext(req);
   const apiKey = process.env.XAI_API_KEY;
   if (!apiKey) {
     return apiError("server_error", "Brak konfiguracji modelu AI po stronie serwera.", 500);

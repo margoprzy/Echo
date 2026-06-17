@@ -1,4 +1,4 @@
-import { db, json, apiError, requireToken, mapDbError, plainTextToHtml, preflight } from "@/lib/api/server";
+import { db, json, apiError, requireToken, mapDbError, plainTextToHtml, preflight, setRequestContext } from "@/lib/api/server";
 import { uploadApiPhotos, resolveUserId } from "@/lib/api/server-storage";
 import { htmlToPlainText } from "@/lib/freud";
 
@@ -45,11 +45,12 @@ function todayISODate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export async function OPTIONS() {
-  return preflight();
+export async function OPTIONS(req: Request) {
+  return preflight(req);
 }
 
 export async function POST(req: Request) {
+  setRequestContext(req);
   const auth = requireToken(req);
   if ("response" in auth) return auth.response;
 
@@ -130,6 +131,7 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
+  setRequestContext(req);
   const auth = requireToken(req);
   if ("response" in auth) return auth.response;
 

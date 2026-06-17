@@ -34,15 +34,37 @@ export function bearerToken(req: Request): string | null {
   return match ? match[1].trim() : null;
 }
 
-const CORS_HEADERS: Record<string, string> = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type",
-};
+const ALLOWED_ORIGINS = [
+  "https://echo-dziennik.vercel.app",
+  process.env.NEXT_PUBLIC_SITE_URL,
+].filter(Boolean) as string[];
 
-/** Odpowiedź JSON z nagłówkami CORS (żeby API dało się wołać też z przeglądarki/agenta). */
+function corsOrigin(req?: Request): string {
+  const origin = req?.headers.get("origin") ?? "";
+  if (ALLOWED_ORIGINS.includes(origin)) return origin;
+  if (process.env.NODE_ENV === "development") return origin || "*";
+  return ALLOWED_ORIGINS[0] ?? "";
+}
+
+function corsHeaders(req?: Request): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin": corsOrigin(req),
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    Vary: "Origin",
+  };
+}
+
+let _currentReq: Request | undefined;
+
+/** Ustawia bieżące żądanie dla CORS — wołaj na początku handlera. */
+export function setRequestContext(req: Request) {
+  _currentReq = req;
+}
+
+/** Odpowiedź JSON z nagłówkami CORS. */
 export function json(data: unknown, status = 200): Response {
-  return Response.json(data, { status, headers: CORS_HEADERS });
+  return Response.json(data, { status, headers: corsHeaders(_currentReq) });
 }
 
 /** Ustandaryzowany błąd: { error: { code, message } }. */
@@ -51,8 +73,8 @@ export function apiError(code: string, message: string, status: number): Respons
 }
 
 /** Obsługa preflight CORS. */
-export function preflight(): Response {
-  return new Response(null, { status: 204, headers: CORS_HEADERS });
+export function preflight(req?: Request): Response {
+  return new Response(null, { status: 204, headers: corsHeaders(req ?? _currentReq) });
 }
 
 /**
@@ -83,13 +105,21 @@ export function mapDbError(error: { message?: string; code?: string }): Response
   return apiError("server_error", "Błąd serwera podczas przetwarzania żądania.", 500);
 }
 
-/** Prosty plain-text → HTML (akapity), żeby wpis ładnie wyświetlił się w Echo. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/** Plain-text → HTML (akapity). Wszelkie znaczniki HTML w treści są escape'owane. */
 export function plainTextToHtml(text: string): string {
   const trimmed = (text ?? "").trim();
   if (!trimmed) return "";
-  // Jeśli ktoś przysłał już HTML, zostaw bez zmian.
-  if (/<\/?[a-z][\s\S]*>/i.test(trimmed)) return trimmed;
-  return trimmed
+  const safe = escapeHtml(trimmed);
+  return safe
     .split(/\n{2,}/)
     .map((para) => `<p>${para.replace(/\n/g, "<br>")}</p>`)
     .join("");

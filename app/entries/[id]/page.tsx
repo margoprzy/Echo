@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Trash2, Sparkles } from "lucide-react";
+import DOMPurify from "dompurify";
 import { getEntries, deleteEntry } from "@/lib/storage";
 import { getSignedUrlsOrdered, deletePhotos } from "@/lib/photos";
 import type { Entry } from "@/lib/types";
@@ -167,11 +168,11 @@ export default function EntryDetailPage() {
           </div>
         )}
 
-        {/* Content */}
+        {/* Content — sanitized to prevent XSS */}
         <div
           className="prose prose-invert max-w-none text-white/85 text-[16px] leading-relaxed echo-enter"
           style={{ ["--enter-delay" as string]: "90ms" }}
-          dangerouslySetInnerHTML={{ __html: entry.content }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(entry.content) }}
         />
 
         {/* Analyze with AI — below the entry */}
