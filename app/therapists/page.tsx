@@ -1,0 +1,221 @@
+"use client";
+
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Users, Check, Lock, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+
+interface Therapist {
+  id: string;
+  handle: string;
+  name: string;
+  tagline: string | null;
+  image_url: string | null;
+  price_cents: number;
+  currency: string;
+  is_free: boolean;
+  owned: boolean;
+  is_active_selection: boolean;
+}
+
+function formatPrice(cents: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat("pl-PL", { style: "currency", currency }).format(cents / 100);
+  } catch {
+    return `${(cents / 100).toFixed(2)} ${currency}`;
+  }
+}
+
+function TherapistsContent() {
+  const searchParams = useSearchParams();
+  const [therapists, setTherapists] = useState<Therapist[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const { data, error } = await supabase.rpc("list_therapists");
+    if (!error && Array.isArray(data)) {
+      setTherapists(data as Therapist[]);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // Powrót z udanej płatności — dostęp pojawia się po przetworzeniu webhooka, więc odświeżamy.
+  useEffect(() => {
+    if (searchParams.get("purchased") === "1") {
+      setToast("Dziękujemy za zakup! Jeśli terapeuta nie jest jeszcze odblokowany, odśwież za chwilę.");
+      load();
+    }
+  }, [searchParams, load]);
+
+  async function selectTherapist(id: string) {
+    setBusyId(id);
+    const { error } = await supabase.rpc("set_active_therapist", { p_therapist_id: id });
+    if (error) {
+      setToast("Nie udało się ustawić terapeuty.");
+    } else {
+      setTherapists((prev) =>
+        prev.map((t) => ({ ...t, is_active_selection: t.id === id }))
+      );
+    }
+    setBusyId(null);
+  }
+
+  async function buy(t: Therapist) {
+    setBusyId(t.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        setToast("Zaloguj się, aby kupić terapeutę.");
+        setBusyId(null);
+        return;
+      }
+      // Serwer buduje link do kasy Shopify (z echo_user_id) dla wybranego terapeuty.
+      const res = await fetch("/api/shopify/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ therapistId: t.id }),
+      });
+      const json = await res.json();
+      if (res.ok && json.url) {
+        window.location.href = json.url;
+        return;
+      }
+      setToast(json.error ?? "Nie udało się rozpocząć płatności.");
+    } catch {
+      setToast("Nie udało się rozpocząć płatności.");
+    }
+    setBusyId(null);
+  }
+
+  return (
+    <div className="px-5 pt-3 pb-10 max-w-3xl mx-auto">
+      {/* Header — desktop */}
+      <div className="hidden md:flex items-center gap-2 echo-enter">
+        <Users size={20} style={{ color: "#A07DE0" }} />
+        <h1 className="text-2xl font-semibold text-white tracking-tight">Wybierz terapeutę</h1>
+      </div>
+      <p className="text-sm text-white/50 mt-2 md:mt-3 echo-enter">
+        Rozmawiaj z wybraną osobowością. Freud jest dostępny za darmo — kolejni terapeuci po wykupieniu dostępu.
+      </p>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-white/50 mt-10">
+          <Loader2 size={18} className="animate-spin" /> Ładowanie…
+        </div>
+      ) : (
+        <div className="mt-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {therapists.map((t) => {
+            const locked = !t.owned;
+            const busy = busyId === t.id;
+            return (
+              <div
+                key={t.id}
+                className={`relative rounded-[18px] border p-5 transition-colors echo-enter ${
+                  t.is_active_selection
+                    ? "border-[#7C5CBF]/60 bg-[#7C5CBF]/[0.12]"
+                    : "border-white/10 bg-white/[0.03]"
+                }`}
+              >
+                {t.is_active_selection && (
+                  <span className="absolute top-4 right-4 inline-flex items-center gap-1 text-[11px] text-[#A07DE0]">
+                    <Check size={13} /> Aktywny
+                  </span>
+                )}
+
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${
+                      locked ? "opacity-50" : ""
+                    }`}
+                    style={{ background: "linear-gradient(135deg, #7C5CBF 0%, #A07DE0 100%)" }}
+                  >
+                    {t.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={t.image_url} alt={t.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <Users size={22} className="text-white" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className={`text-base font-semibold ${locked ? "text-white/50" : "text-white"}`}>
+                      {t.name}
+                    </p>
+                    <p className="text-[12px] text-white/40">
+                      {t.is_free ? "Za darmo" : formatPrice(t.price_cents, t.currency)}
+                    </p>
+                  </div>
+                </div>
+
+                {t.tagline && (
+                  <p className={`text-sm mt-3 leading-relaxed ${locked ? "text-white/35" : "text-white/65"}`}>
+                    {t.tagline}
+                  </p>
+                )}
+
+                <div className="mt-4">
+                  {t.owned ? (
+                    <button
+                      onClick={() => selectTherapist(t.id)}
+                      disabled={busy || t.is_active_selection}
+                      className="w-full py-2.5 rounded-[12px] text-sm font-medium text-white transition-all active:scale-[0.99] disabled:opacity-40"
+                      style={{
+                        background: t.is_active_selection
+                          ? "rgba(255,255,255,0.08)"
+                          : "linear-gradient(135deg, #7C5CBF 0%, #A07DE0 100%)",
+                      }}
+                    >
+                      {busy ? "…" : t.is_active_selection ? "Wybrany" : "Wybierz"}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => buy(t)}
+                      disabled={busy}
+                      className="w-full py-2.5 rounded-[12px] text-sm font-medium text-white border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] transition-all active:scale-[0.99] disabled:opacity-40 inline-flex items-center justify-center gap-2"
+                    >
+                      {busy ? (
+                        <Loader2 size={15} className="animate-spin" />
+                      ) : (
+                        <Lock size={14} />
+                      )}
+                      {busy ? "Przekierowanie…" : "Kup"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {toast && (
+        <div
+          className="fixed left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-full text-sm text-white border border-white/10 max-w-[90%] text-center"
+          style={{
+            bottom: "90px",
+            background: "rgba(17,14,36,0.92)",
+            backdropFilter: "blur(8px)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+          }}
+          onClick={() => setToast(null)}
+        >
+          {toast}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function TherapistsPage() {
+  return (
+    <Suspense fallback={null}>
+      <TherapistsContent />
+    </Suspense>
+  );
+}

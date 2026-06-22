@@ -70,6 +70,7 @@ function AiContent() {
 
   const [contextEntry, setContextEntry] = useState<Entry | null>(null);
   const [dayCount, setDayCount] = useState(0);
+  const [activeTherapist, setActiveTherapist] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [input, setInput] = useState("");
   const sessionTokenRef = useRef<string | null>(null);
@@ -120,6 +121,13 @@ function AiContent() {
       // Pobierz access token sesji Supabase — potrzebny do wyszukiwania hybrydowego.
       const { data: { session } } = await supabase.auth.getSession();
       sessionTokenRef.current = session?.access_token ?? null;
+
+      // Aktywny terapeuta (do wyświetlenia w nagłówku). Serwer i tak weryfikuje dostęp.
+      supabase.rpc("list_therapists").then(({ data }) => {
+        if (cancelled || !Array.isArray(data)) return;
+        const active = data.find((t: { is_active_selection?: boolean }) => t.is_active_selection);
+        setActiveTherapist((active as { name?: string } | undefined)?.name ?? null);
+      });
 
       const rows = await getEntries();
       if (cancelled) return;
@@ -222,6 +230,11 @@ function AiContent() {
         <Bot size={20} style={{ color: "#A07DE0" }} />
         <h1 className="text-2xl font-semibold text-white tracking-tight">Analiza AI</h1>
       </div>
+      {activeTherapist && (
+        <p className="text-[12px] text-white/40 mt-1 md:mt-1.5 echo-enter">
+          Rozmawiasz z: <span className="text-white/70">{activeTherapist}</span>
+        </p>
+      )}
 
       {/* Context banner */}
       {contextEntry && (

@@ -53,9 +53,32 @@ export async function POST(req: Request) {
     ? [contextEntry]
     : [];
 
+  // Klient Supabase z tożsamością użytkownika (auth.uid() z sesji) — do RPC poniżej.
+  const supabaseAuthed = sessionToken
+    ? createClient(
+        cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL),
+        cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+        { global: { headers: { Authorization: `Bearer ${sessionToken}` } } }
+      )
+    : null;
+
+  // Prompt systemowy = aktywny terapeusta (jeśli kupiony/darmowy), inaczej fallback do Freuda.
+  let systemPrompt = FREUD.systemPrompt;
+  if (supabaseAuthed) {
+    try {
+      const { data, error } = await supabaseAuthed.rpc("get_active_therapist_prompt");
+      const row = Array.isArray(data) ? data[0] : null;
+      if (!error && row?.system_prompt) {
+        systemPrompt = row.system_prompt as string;
+      }
+    } catch (err) {
+      console.warn("get_active_therapist_prompt error:", err);
+    }
+  }
+
   // Wyszukiwanie hybrydowe: embedding ostatniej wiadomości użytkownika + search_entries.
   let relevantEntries: Entry[] = [];
-  if (sessionToken) {
+  if (supabaseAuthed) {
     try {
       const lastUserMessage = messages
         .slice()
@@ -72,12 +95,7 @@ export async function POST(req: Request) {
           const queryEmbeddingLit = toVectorLiteral(queryEmbedding);
 
           // Woła search_entries z auth.uid() — tożsamość z sesji.
-          const supabase = createClient(
-            cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL),
-            cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-            { global: { headers: { Authorization: `Bearer ${sessionToken}` } } }
-          );
-          const { data: searchResults, error: searchError } = await supabase.rpc("search_entries", {
+          const { data: searchResults, error: searchError } = await supabaseAuthed.rpc("search_entries", {
             p_query_text: userText,
             p_query_embedding: queryEmbeddingLit,
             p_limit: 8,
@@ -98,7 +116,7 @@ export async function POST(req: Request) {
   }
 
   const xai = createXai({ apiKey });
-  const system = `${FREUD.systemPrompt}\n\n${buildContextBlock(focalDay, recentEntries, relevantEntries)}`;
+  const system = `${systemPrompt}\n\n${buildContextBlock(focalDay, recentEntries, relevantEntries)}`;
 
   const result = streamText({
     model: xai("grok-4-1-fast-reasoning"),

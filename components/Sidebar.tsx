@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PenLine, CalendarDays, Bot, UserCircle2, FileText } from "lucide-react";
+import { PenLine, CalendarDays, Bot, UserCircle2, FileText, Users } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/write", label: "Pisz", Icon: PenLine },
   { href: "/calendar", label: "Kalendarz", Icon: CalendarDays },
   { href: "/ai", label: "Analiza AI", Icon: Bot },
+  { href: "/therapists", label: "Wybierz terapeutę", Icon: Users },
   { href: "/docs", label: "API / Dokumentacja", Icon: FileText },
   { href: "/profile", label: "Profil", Icon: UserCircle2 },
 ];
