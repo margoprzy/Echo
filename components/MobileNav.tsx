@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, PenLine, CalendarDays, Bot, UserCircle2, FileText, Users } from "lucide-react";
+import { Menu, X, PenLine, CalendarDays, Bot, UserCircle2, FileText, Users, LayoutGrid } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/write", label: "Pisz", Icon: PenLine },
   { href: "/calendar", label: "Kalendarz", Icon: CalendarDays },
+  { href: "/posts", label: "Posty", Icon: LayoutGrid },
   { href: "/ai", label: "Analiza AI", Icon: Bot },
   { href: "/therapists", label: "Wybierz terapeutę", Icon: Users },
   { href: "/docs", label: "API / Dokumentacja", Icon: FileText },
@@ -17,6 +18,7 @@ const NAV_ITEMS = [
 const TITLES: Record<string, string> = {
   "/write": "Pisz",
   "/calendar": "Kalendarz",
+  "/posts": "Posty",
   "/ai": "Analiza AI",
   "/therapists": "Wybierz terapeutę",
   "/docs": "API / Dokumentacja",

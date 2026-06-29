@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Users, Check, Lock, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { track } from "@/lib/analytics";
 
 interface Therapist {
   id: string;
@@ -91,6 +92,12 @@ function TherapistsContent() {
         ? list.find((t) => t.handle === pendingHandle && t.owned)
         : list.find((t) => !t.is_free && t.owned);
       if (target) {
+        track("therapist_purchased", {
+          handle: target.handle,
+          name: target.name,
+          price_cents: target.price_cents,
+          currency: target.currency,
+        });
         // Nie ustawiamy aktywnego automatycznie — karta sama pokazuje już „Wybierz”
         // (lista odświeżona powyżej), a użytkownik klika „Wybierz” sam.
         setToast(`Gotowe! ${target.name} odblokowany — kliknij „Wybierz”.`);
@@ -119,6 +126,7 @@ function TherapistsContent() {
       setBusyId(null);
       return;
     }
+    track("therapist_selected", { therapist_id: id });
     // Po wyborze terapeuty przenosimy użytkownika prosto do czatu „Analiza AI".
     router.push("/ai");
   }
@@ -207,6 +215,12 @@ function TherapistsContent() {
                     <a
                       href={stripeUrlFor(t)!}
                       onClick={() => {
+                        track("therapist_checkout_started", {
+                          handle: t.handle,
+                          name: t.name,
+                          price_cents: t.price_cents,
+                          currency: t.currency,
+                        });
                         // Zapamiętaj, którego terapeutę kupujemy — po powrocie z płatności
                         // ustawimy go automatycznie jako aktywnego.
                         try {

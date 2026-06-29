@@ -147,13 +147,13 @@ export default function EntryDetailPage() {
 
         {/* Galeria zdjęć — pozioma. Stare wpisy mają photoUrl (base64). */}
         {entry.photoUrl && photoUrls.length === 0 && (
-          <div className="w-full h-52 rounded-[20px] overflow-hidden border border-white/10">
+          <div data-ph-no-capture className="w-full h-52 rounded-[20px] overflow-hidden border border-white/10">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={entry.photoUrl} alt="" className="w-full h-full object-cover" />
           </div>
         )}
         {photoUrls.length > 0 && (
-          <div className="-mx-5 px-5 overflow-x-auto echo-no-scrollbar">
+          <div data-ph-no-capture className="-mx-5 px-5 overflow-x-auto echo-no-scrollbar">
             <div className="flex gap-3 snap-x snap-mandatory pb-1">
               {photoUrls.map((url, i) => (
                 <div
@@ -170,6 +170,7 @@ export default function EntryDetailPage() {
 
         {/* Content — sanitized to prevent XSS */}
         <div
+          data-ph-mask
           className="prose prose-invert max-w-none text-white/85 text-[16px] leading-relaxed echo-enter"
           style={{ ["--enter-delay" as string]: "90ms" }}
           dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(entry.content) }}

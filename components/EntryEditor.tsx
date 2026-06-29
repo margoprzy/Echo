@@ -156,7 +156,7 @@ export default function EntryEditor({
   return (
     <div>
       {editor && <Toolbar editor={editor} />}
-      <div className="relative" onClick={() => editor?.commands.focus()}>
+      <div className="relative" data-ph-mask onClick={() => editor?.commands.focus()}>
         {isEmpty && !isFocused && (
           <p className="absolute top-0 left-0 text-white/50 text-[14px] leading-relaxed pointer-events-none select-none">
             {placeholder}

@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
+import posthog from "posthog-js";
 import { supabase } from "@/lib/supabase";
 
 interface AuthContextValue {
@@ -42,6 +43,16 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     return () => listener.subscription.unsubscribe();
   }, []);
 
+  // Powiązanie zdarzeń PostHog z konkretnym użytkownikiem (analiza per osoba).
+  useEffect(() => {
+    if (!posthog.__loaded) return;
+    if (session?.user) {
+      posthog.identify(session.user.id, {
+        email: session.user.email,
+      });
+    }
+  }, [session?.user?.id]);
+
   useEffect(() => {
     if (!ready) return;
     // Ścieżki publiczne — dostępne bez logowania (np. dokumentacja API dla deweloperów).
@@ -62,6 +73,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
   async function signOut() {
     await supabase.auth.signOut();
+    if (posthog.__loaded) posthog.reset();
     router.replace("/login");
   }
 

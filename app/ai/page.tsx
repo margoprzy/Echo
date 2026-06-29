@@ -13,6 +13,7 @@ import {
 } from "@/lib/storage";
 import { supabase } from "@/lib/supabase";
 import { useSpeechRecognition } from "@/lib/useSpeechRecognition";
+import { track } from "@/lib/analytics";
 import type { Entry } from "@/lib/types";
 
 const RECENT_DAYS = 30;
@@ -208,6 +209,11 @@ function AiContent() {
 
   function handleSend() {
     if (!input.trim()) return;
+    track("therapist_message_sent", {
+      mode,
+      char_count: input.trim().length,
+      therapist: activeTherapist,
+    });
     send(input);
     setInput("");
   }
@@ -265,7 +271,7 @@ function AiContent() {
       )}
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto mt-6 space-y-4 pr-1">
+      <div ref={scrollRef} data-ph-mask className="flex-1 overflow-y-auto mt-6 space-y-4 pr-1">
         {showGreeting && (
           <FreudBubble>
             Witaj. Opowiedz, co Cię teraz zajmuje — a wspólnie przyjrzymy się temu, co

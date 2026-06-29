@@ -106,7 +106,7 @@ export default function CalendarPage() {
                   <span className="text-xs text-[#A07DE0] font-medium shrink-0 mt-0.5 tabular-nums">
                     {formatTime(entry.date)}
                   </span>
-                  <p className="text-white/75 text-sm leading-relaxed line-clamp-2 min-w-0">
+                  <p data-ph-mask className="text-white/75 text-sm leading-relaxed line-clamp-2 min-w-0">
                     {excerpt || <span className="text-white/30 italic">Brak tekstu</span>}
                   </p>
                 </Link>

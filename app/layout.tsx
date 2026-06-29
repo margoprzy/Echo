@@ -4,6 +4,7 @@ import "./globals.css";
 import MobileNav from "@/components/MobileNav";
 import Sidebar from "@/components/Sidebar";
 import AuthProvider from "@/components/AuthProvider";
+import PostHogProvider from "@/components/PostHogProvider";
 
 const openSans = Open_Sans({
   variable: "--font-open-sans",
@@ -23,6 +24,7 @@ export default function RootLayout({
   return (
     <html lang="pl" className={`${openSans.variable} h-full antialiased`}>
       <body className="min-h-full font-[family-name:var(--font-open-sans)]" style={{ background: "#020617" }}>
+        <PostHogProvider>
         <AuthProvider>
           {/* Desktop: sidebar + content | Mobile: centered card */}
           <div className="md:flex md:min-h-screen">
@@ -43,6 +45,7 @@ export default function RootLayout({
             </div>
           </div>
         </AuthProvider>
+        </PostHogProvider>
       </body>
     </html>
   );

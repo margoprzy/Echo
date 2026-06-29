@@ -10,6 +10,7 @@ import { getRandomQuestion } from "@/lib/questions";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import { uploadPhoto, getSignedUrls, deletePhotos } from "@/lib/photos";
+import { track } from "@/lib/analytics";
 import type { Entry } from "@/lib/types";
 
 function todayLabel(): string {
@@ -103,7 +104,7 @@ function PhotoGallery({
   const hasAny = items.length || pending?.length || legacyDataUrl;
   if (!hasAny) return null;
   return (
-    <div className="-mx-5 px-5 mb-4 overflow-x-auto echo-no-scrollbar">
+    <div data-ph-no-capture className="-mx-5 px-5 mb-4 overflow-x-auto echo-no-scrollbar">
       <div className="flex gap-3 snap-x snap-mandatory pb-1">
         {legacyDataUrl && (
           <div className="relative shrink-0 snap-start w-[78%] max-w-[320px] aspect-[4/3] rounded-[16px] overflow-hidden border border-white/10">
@@ -262,6 +263,7 @@ function WriteContent() {
         }
         uploadedThisSession.current.push(path);
         setPhotoPaths((prev) => [...prev, path]);
+        track("photo_added", { context: editId ? "edit" : "create" });
         const urls = await getSignedUrls([path]);
         setSignedUrls((prev) => ({ ...prev, ...urls }));
       })
@@ -319,6 +321,12 @@ function WriteContent() {
           photoPaths: photoPaths.length ? photoPaths : undefined,
         };
     await saveEntry(entry);
+    track(existingEntry ? "entry_edited" : "entry_created", {
+      char_count: text.length,
+      photo_count: photoPaths.length,
+      with_photo: hasPhoto,
+      destination,
+    });
     // Zapisane: zdjęcia dodane w tej sesji już są w bazie — nie kasujemy ich z bucketu.
     uploadedThisSession.current = [];
     setSaved(true);
@@ -513,7 +521,12 @@ function WriteContent() {
               onInsertHandled={() => setPendingTranscript(null)}
             />
             <div className="absolute" style={{ bottom: "16px", right: "16px" }}>
-              <VoiceRecorder onTranscript={(text) => setPendingTranscript(text)} />
+              <VoiceRecorder
+                onTranscript={(text) => {
+                  track("voice_recorded", { char_count: text.length });
+                  setPendingTranscript(text);
+                }}
+              />
             </div>
           </div>
         ) : (
